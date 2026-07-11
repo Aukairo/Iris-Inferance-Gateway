@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iris Engine - Admin Dashboard</title>
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f5f7ff',
+                            100: '#ebf0ff',
+                            200: '#d6e0ff',
+                            300: '#adc2ff',
+                            400: '#7599ff',
+                            500: '#4666ff',
+                            600: '#2b40f5',
+                            700: '#202edb',
+                            800: '#1b25b3',
+                            900: '#1c258f',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at top right, rgba(70, 102, 255, 0.1) 0%, rgba(10, 10, 12, 1) 70%);
+        }
+        .glass-panel {
+            background: rgba(18, 18, 24, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-input {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            transition: all 0.2s ease-in-out;
+        }
+        .glass-input:focus {
+            border-color: rgba(70, 102, 255, 0.6);
+            background: rgba(255, 255, 255, 0.06);
+            outline: none;
+            box-shadow: 0 0 15px rgba(70, 102, 255, 0.15);
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-100 flex flex-col antialiased">
+
+    <!-- Header Section -->
+    <header class="border-b border-white/5 py-4 px-6 md:px-12 flex justify-between items-center glass-panel sticky top-0 z-40 backdrop-blur-md">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center shadow-lg shadow-brand-500/20">
+                <svg class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">Iris Engine</h1>
+                <p class="text-xs text-slate-400 font-medium">Apple Silicon Local LLM Engine</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div id="conn-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected
+            </div>
+            <button onclick="logout()" class="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-white/5 border border-white/10 hover:bg-white/10 transition duration-150">
+                Sign Out
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-6 md:p-12 space-y-8">
+        
+        <!-- Summary Cards -->
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <!-- Card 1 -->
+            <div class="glass-panel rounded-2xl p-6 flex items-center gap-5">
+                <div class="p-4 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-400 font-medium">Registered API Keys</p>
+                    <h3 id="stat-total-keys" class="text-2xl font-bold mt-1">0</h3>
+                </div>
+            </div>
+            <!-- Card 2 -->
+            <div class="glass-panel rounded-2xl p-6 flex items-center gap-5">
+                <div class="p-4 rounded-xl bg-violet-500/10 text-violet-400 border border-violet-500/20">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-400 font-medium">Active API Keys</p>
+                    <h3 id="stat-active-keys" class="text-2xl font-bold mt-1">0</h3>
+                </div>
+            </div>
+            <!-- Card 3 -->
+            <div class="glass-panel rounded-2xl p-6 flex items-center gap-5">
+                <div class="p-4 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-400 font-medium">Cumulative Tokens</p>
+                    <h3 id="stat-total-tokens" class="text-2xl font-bold mt-1">0</h3>
+                </div>
+            </div>
+            <!-- Card 4 -->
+            <div class="glass-panel rounded-2xl p-6 flex items-center gap-5">
+                <div class="p-4 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-400 font-medium">Cumulative Spend</p>
+                    <h3 id="stat-total-spend" class="text-2xl font-bold mt-1">$0.0000</h3>
+                </div>
+            </div>
+        </section>
+
+        <!-- Configuration Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Model Pricing settings Panel -->
+            <section class="glass-panel rounded-2xl p-6 shadow-2xl flex flex-col justify-between space-y-4">
+                <div>
+                    <h2 class="text-lg font-bold tracking-tight text-white">Model Pricing Configuration</h2>
+                    <p class="text-xs text-slate-400 mt-1 mb-4">Configure active token rates (per 1M tokens) to dynamically calculate customer billing costs.</p>
+                </div>
+                
+                <form onsubmit="handleSavePricing(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Input (per 1M)</label>
+                        <input type="number" step="0.0001" id="price-input" min="0.0000" placeholder="0.15" class="w-full px-4 py-3 rounded-xl glass-input text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Output (per 1M)</label>
+                        <input type="number" step="0.0001" id="price-output" min="0.0000" placeholder="0.60" class="w-full px-4 py-3 rounded-xl glass-input text-sm" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Cached (per 1M)</label>
+                        <input type="number" step="0.0001" id="price-cached" min="0.0000" placeholder="0.075" class="w-full px-4 py-3 rounded-xl glass-input text-sm" required>
+                    </div>
+                    <div class="sm:col-span-3">
+                        <button type="submit" class="w-full py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-brand-600/15">
+                            Save Pricing
+                        </button>
+                    </div>
+                </form>
+                <div id="pricing-success" class="hidden text-xs text-emerald-400 font-semibold bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-xl mt-2"></div>
+                <div id="pricing-error" class="hidden text-xs text-rose-400 font-semibold bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-xl mt-2"></div>
+            </section>
+
+            <!-- Public Sharing Tunnel Panel -->
+            <section class="glass-panel rounded-2xl p-6 shadow-2xl flex flex-col justify-between space-y-4">
+                <div>
+                    <h2 class="text-lg font-bold tracking-tight text-white">Public Sharing Tunnel</h2>
+                    <p class="text-xs text-slate-400 mt-1 mb-4">Securely expose your local Iris Engine instance to the public internet for remote API access and client testing.</p>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Status Display -->
+                    <div class="flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/10">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</span>
+                        <div id="tunnel-badge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20">
+                            <span id="tunnel-dot" class="h-2.5 w-2.5 rounded-full bg-slate-400"></span>
+                            <span id="tunnel-status-text">Inactive</span>
+                        </div>
+                    </div>
+
+                    <!-- Progress bar (hidden by default) -->
+                    <div id="tunnel-progress-container" class="hidden space-y-2">
+                        <div class="flex justify-between text-xs text-slate-400">
+                            <span>Downloading cloudflared binary...</span>
+                            <span id="tunnel-progress-pct">0%</span>
+                        </div>
+                        <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
+                            <div id="tunnel-progress-bar" class="bg-brand-500 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+
+                    <!-- Share URL Field -->
+                    <div class="flex gap-2">
+                        <input type="text" id="tunnel-url-input" class="w-full px-4 py-3 rounded-xl glass-input text-sm text-slate-400 bg-white/5 border border-white/10" readonly placeholder="Tunnel is inactive">
+                        <button onclick="copyTunnelUrl()" id="tunnel-copy-btn" disabled class="px-4 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-slate-400 disabled:opacity-50 rounded-xl text-sm font-semibold transition flex items-center justify-center">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mt-2">
+                    <button id="tunnel-toggle-btn" onclick="toggleTunnel()" class="w-full py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-brand-600/15">
+                        Enable Sharing
+                    </button>
+                </div>
+            </section>
+        </div>
+        <!-- Visual Analytics Dashboard Panel -->
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="glass-panel rounded-2xl p-6 shadow-2xl space-y-4">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">Token Allocation by Client</h2>
+                <div class="h-[250px] relative flex justify-center items-center">
+                    <canvas id="tokens-chart"></canvas>
+                </div>
+            </div>
+            <div class="glass-panel rounded-2xl p-6 shadow-2xl space-y-4">
+                <h2 class="text-xs font-bold uppercase tracking-wider text-slate-400">USD Cost Spent by Client</h2>
+                <div class="h-[250px] relative flex justify-center items-center">
+                    <canvas id="cost-chart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- API Keys Management Panel -->
+        <section class="glass-panel rounded-2xl overflow-hidden shadow-2xl">
+            <div class="px-6 py-5 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/[0.01]">
+                <div>
+                    <h2 class="text-lg font-bold tracking-tight text-white">Active API Keys</h2>
+                    <p class="text-xs text-slate-400 mt-1">Provision client API keys, set total token and cost caps, and monitor live consumption.</p>
+                </div>
+                <button onclick="openCreateModal()" class="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-brand-600/15 flex items-center justify-center gap-2">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    New API Key
+                </button>
+            </div>
+
+            <!-- Keys Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-xs text-slate-400 uppercase font-semibold border-b border-white/5 bg-white/[0.005]">
+                            <th class="px-6 py-4">Client / Label</th>
+                            <th class="px-6 py-4">API Bearer Key</th>
+                            <th class="px-6 py-4">Token Cap & Usage</th>
+                            <th class="px-6 py-4">Cost & Budget Cap</th>
+                            <th class="px-6 py-4">Tokens (Input / Output / Cache)</th>
+                            <th class="px-6 py-4 text-center">Status</th>
+                            <th class="px-6 py-4 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="keys-table-body" class="divide-y divide-white/5 text-sm">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="no-keys-view" class="hidden py-16 text-center">
+                <svg class="h-12 w-12 text-slate-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0a2 2 0 01-2 2H6a2 2 0 01-2-2m16 0V9a2 2 0 00-2-2H6a2 2 0 00-2 2v2m16 4h-3.88l-.513-2.054A2 2 0 0015.658 12H8.342a2 2 0 00-1.95 1.946l-.513 2.054H2" />
+                </svg>
+                <h3 class="text-slate-300 font-semibold text-base">No API Keys Configured</h3>
+                <p class="text-slate-400 text-xs mt-1">Create an API key above to restrict server access and track token budgets.</p>
+            </div>
+        </section>
+
+        <!-- Revoked Keys / Usage History Panel -->
+        <section class="glass-panel rounded-2xl overflow-hidden shadow-2xl">
+            <div class="px-6 py-5 border-b border-white/5 bg-white/[0.01]">
+                <h2 class="text-lg font-bold tracking-tight text-white">Revoked Keys & Historical Usage</h2>
+                <p class="text-xs text-slate-400 mt-1">Archived API keys that have been deactivated. Their usage is preserved in cumulative stats.</p>
+            </div>
+
+            <!-- Revoked Keys Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-xs text-slate-400 uppercase font-semibold border-b border-white/5 bg-white/[0.005]">
+                            <th class="px-6 py-4">Client / Label</th>
+                            <th class="px-6 py-4">API Bearer Key</th>
+                            <th class="px-6 py-4">Total Tokens Used</th>
+                            <th class="px-6 py-4">Total Amount Spent</th>
+                            <th class="px-6 py-4 text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="revoked-keys-table-body" class="divide-y divide-white/5 text-sm">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <div id="no-revoked-keys-view" class="hidden py-12 text-center text-slate-500 text-xs">
+                No deactivated/revoked API keys found in system.
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 py-6 px-6 text-center text-xs text-slate-500 mt-auto">
+        <p>© 2026 Iris Engine. Under MIT License.</p>
+    </footer>
+
+    <!-- TUNNEL CONFIRM MODAL -->
+    <div id="tunnel-confirm-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md items-center justify-center z-50 hidden transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-lg rounded-3xl p-8 shadow-2xl relative border border-white/10 mx-4">
+            <!-- Header -->
+            <div class="flex justify-between items-start mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="p-3 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Enable Public Sharing</h2>
+                        <p class="text-xs text-slate-400 mt-0.5">Review before proceeding</p>
+                    </div>
+                </div>
+                <button onclick="closeTunnelConfirmModal()" class="p-1 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Download notice (shown only when binary needs downloading) -->
+            <div id="tunnel-confirm-download-notice" class="hidden mb-5 p-4 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                <div class="flex items-start gap-3">
+                    <svg class="h-5 w-5 text-amber-400 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    <div>
+                        <p class="text-xs font-bold text-amber-400 mb-1">One-time download required</p>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            The <span class="font-semibold text-white">cloudflared</span> binary (~30 MB) will be downloaded from
+                            <span class="font-mono text-brand-400 text-[11px]">github.com/cloudflare/cloudflared</span> and saved to
+                            <span class="font-mono text-slate-200 text-[11px]">bin/cloudflared</span> inside your project. Subsequent starts use the cached binary instantly.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Already cached notice -->
+            <div id="tunnel-confirm-cached-notice" class="hidden mb-5 p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/20">
+                <div class="flex items-center gap-3">
+                    <svg class="h-5 w-5 text-emerald-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p class="text-xs text-emerald-300 font-medium">
+                        <span class="font-bold text-emerald-400">cloudflared</span> is already cached locally — tunnel will start immediately.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Info bullets -->
+            <ul class="space-y-3 mb-7">
+                <li class="flex items-start gap-3">
+                    <span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-brand-400 shrink-0"></span>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        <span class="font-semibold text-white">cloudflared</span> is Cloudflare's open-source tunneling tool. It creates a secure, encrypted HTTPS tunnel from your local Iris Engine to a temporary public
+                        <span class="font-mono text-brand-400 text-[11px]">*.trycloudflare.com</span> URL accessible from anywhere.
+                    </p>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-brand-400 shrink-0"></span>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        <span class="font-semibold text-white">No account required.</span> Cloudflare Quick Tunnels are free and anonymous — no sign-in or configuration needed.
+                    </p>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-brand-400 shrink-0"></span>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        The tunnel is <span class="font-semibold text-white">active only while this server is running</span>. It tears down automatically on shutdown and the public URL changes each session.
+                    </p>
+                </li>
+                <li class="flex items-start gap-3">
+                    <span class="mt-1.5 h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0"></span>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        Anyone with the generated URL can reach your API. <span class="font-semibold text-white">Protect it with an API key</span> if your server should not be publicly accessible.
+                    </p>
+                </li>
+            </ul>
+
+            <!-- Actions -->
+            <div class="flex justify-end gap-3">
+                <button onclick="closeTunnelConfirmModal()" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/10 border border-white/10 transition text-slate-300">
+                    Cancel
+                </button>
+                <button id="tunnel-confirm-proceed-btn" onclick="confirmEnableTunnel()" class="px-5 py-2.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-brand-600/15 flex items-center gap-2">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    Enable Sharing
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIN MODAL -->
+
+    <div id="login-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-8 shadow-2xl relative border border-white/10 mx-4">
+            <div class="text-center mb-6">
+                <div class="h-12 w-12 rounded-2xl bg-gradient-to-tr from-brand-600 to-indigo-400 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-brand-500/20">
+                    <svg class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold tracking-tight text-white">Unlock Admin Interface</h2>
+                <p class="text-xs text-slate-400 mt-1">Please enter your server's configured ADMIN_PASSWORD.</p>
+            </div>
+
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Password</label>
+                    <input type="password" id="admin-pass-input" placeholder="••••••••" class="w-full px-4 py-3 rounded-xl glass-input text-sm" required autofocus>
+                </div>
+                <div id="login-error" class="hidden text-xs text-rose-400 font-semibold bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-xl"></div>
+                <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-sm font-semibold transition duration-150">
+                    Verify & Authenticate
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- CREATE KEY MODAL -->
+    <div id="create-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md items-center justify-center z-50 hidden transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-lg rounded-3xl p-8 shadow-2xl relative border border-white/10 mx-4">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Provision New API Key</h2>
+                    <p class="text-xs text-slate-400 mt-1">Generate a bearer token with optional request limits.</p>
+                </div>
+                <button onclick="closeCreateModal()" class="p-1 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <form onsubmit="handleCreateKey(event)" class="space-y-5">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Client Label / Name</label>
+                    <input type="text" id="new-key-name" placeholder="e.g. Developer MacBook, VS Code, Production Web" class="w-full px-4 py-3 rounded-xl glass-input text-sm" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Token Budget Capping</label>
+                    <select id="new-key-cap-type" onchange="toggleCapLimitInput()" class="w-full px-4 py-3 rounded-xl glass-input text-sm mb-3">
+                        <option value="unlimited">Unlimited (No Limit)</option>
+                        <option value="capped">Capped (Specific Maximum Tokens)</option>
+                    </select>
+                    <div id="new-key-cap-container" class="hidden">
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Max Generated/Processed Tokens Limit</label>
+                        <input type="number" id="new-key-cap-val" min="1" placeholder="e.g. 50000" class="w-full px-4 py-3 rounded-xl glass-input text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Cost / Amount Capping (USD)</label>
+                    <select id="new-key-amount-cap-type" onchange="toggleAmountCapLimitInput()" class="w-full px-4 py-3 rounded-xl glass-input text-sm mb-3">
+                        <option value="unlimited">Unlimited (No Limit)</option>
+                        <option value="capped">Capped (Specific Maximum Cost)</option>
+                    </select>
+                    <div id="new-key-amount-cap-container" class="hidden">
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Max Spent USD Budget</label>
+                        <input type="number" step="0.0001" id="new-key-amount-cap-val" min="0.0001" placeholder="e.g. 10.00" class="w-full px-4 py-3 rounded-xl glass-input text-sm">
+                    </div>
+                </div>
+                <div id="create-error" class="hidden text-xs text-rose-400 font-semibold bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-xl"></div>
+                <div class="flex justify-end gap-3 mt-8">
+                    <button type="button" onclick="closeCreateModal()" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/10 border border-white/10 transition text-slate-300">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-sm font-semibold transition">
+                        Generate Key
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- UPDATE CAP MODAL -->
+    <div id="cap-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md items-center justify-center z-50 hidden transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-md rounded-3xl p-8 shadow-2xl relative border border-white/10 mx-4">
+            <div class="flex justify-between items-start mb-6">
+                <div>
+                    <h2 class="text-lg font-bold text-white">Adjust Key Caps</h2>
+                    <p class="text-xs text-slate-400 mt-1" id="cap-modal-subtitle">Modify cap configuration</p>
+                </div>
+                <button onclick="closeCapModal()" class="p-1 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <form onsubmit="handleUpdateCap(event)" class="space-y-5">
+                <input type="hidden" id="edit-cap-key">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Token Budget Capping</label>
+                    <select id="edit-key-cap-type" onchange="toggleEditCapLimitInput()" class="w-full px-4 py-3 rounded-xl glass-input text-sm mb-3">
+                        <option value="unlimited">Unlimited (No Limit)</option>
+                        <option value="capped">Capped (Specific Maximum Tokens)</option>
+                    </select>
+                    <div id="edit-key-cap-container" class="hidden">
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Max Generated/Processed Tokens Limit</label>
+                        <input type="number" id="edit-key-cap-val" min="1" placeholder="e.g. 50000" class="w-full px-4 py-3 rounded-xl glass-input text-sm">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Cost / Amount Capping (USD)</label>
+                    <select id="edit-key-amount-cap-type" onchange="toggleEditAmountCapLimitInput()" class="w-full px-4 py-3 rounded-xl glass-input text-sm mb-3">
+                        <option value="unlimited">Unlimited (No Limit)</option>
+                        <option value="capped">Capped (Specific Maximum Cost)</option>
+                    </select>
+                    <div id="edit-key-amount-cap-container" class="hidden">
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Max Spent USD Budget</label>
+                        <input type="number" step="0.0001" id="edit-key-amount-cap-val" min="0.0001" placeholder="e.g. 10.00" class="w-full px-4 py-3 rounded-xl glass-input text-sm">
+                    </div>
+                </div>
+                <div id="cap-error" class="hidden text-xs text-rose-400 font-semibold bg-rose-500/10 border border-rose-500/20 px-3 py-2 rounded-xl"></div>
+                <div class="flex justify-end gap-3 mt-8">
+                    <button type="button" onclick="closeCapModal()" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/10 border border-white/10 transition text-slate-300">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-sm font-semibold transition">
+                        Update Limits
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Javascript Actions Logic -->
+    <script>
+        let adminPassword = localStorage.getItem('admin_password') || '';
+        let keysList = [];
+        let tokensChart = null;
+        let costChart = null;
+        let tunnelBinaryExists = false;  // updated from status polling
+
+        window.onload = function() {
+            if (!adminPassword) {
+                showLoginModal();
+            } else {
+                hideLoginModal();
+                fetchKeys();
+                fetchPricing();
+                pollTunnelStatus();
+                if (tunnelPollInterval) clearInterval(tunnelPollInterval);
+                tunnelPollInterval = setInterval(pollTunnelStatus, 3000);
+            }
+        };
+
+        function showLoginModal() {
+            document.getElementById('login-modal').classList.remove('hidden');
+            document.getElementById('login-modal').classList.add('flex');
+            document.getElementById('admin-pass-input').focus();
+        }
+
+        function hideLoginModal() {
+            document.getElementById('login-modal').classList.remove('flex');
+            document.getElementById('login-modal').classList.add('hidden');
+        }
+
+        function logout() {
+            localStorage.removeItem('admin_password');
+            adminPassword = '';
+            if (tunnelPollInterval) {
+                clearInterval(tunnelPollInterval);
+                tunnelPollInterval = null;
+            }
+            showLoginModal();
+            document.getElementById('keys-table-body').innerHTML = '';
+            document.getElementById('revoked-keys-table-body').innerHTML = '';
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const password = document.getElementById('admin-pass-input').value.trim();
+            const errorDiv = document.getElementById('login-error');
+            errorDiv.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/admin/keys', {
+                    headers: { 'X-Admin-Password': password }
+                });
+
+                if (response.ok) {
+                    adminPassword = password;
+                    localStorage.setItem('admin_password', password);
+                    hideLoginModal();
+                    fetchKeys();
+                    fetchPricing();
+                    pollTunnelStatus();
+                    if (tunnelPollInterval) clearInterval(tunnelPollInterval);
+                    tunnelPollInterval = setInterval(pollTunnelStatus, 3000);
+                    document.getElementById('admin-pass-input').value = '';
+                } else {
+                    const err = await response.json();
+                    errorDiv.innerText = err.detail || 'Authentication failed.';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.innerText = 'Unable to connect to Iris Engine.';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        async function fetchPricing() {
+            try {
+                const response = await fetch('/api/admin/config/pricing', {
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+                if (response.ok) {
+                    const pricing = await response.json();
+                    document.getElementById('price-input').value = pricing.price_per_1m_input_tokens;
+                    document.getElementById('price-output').value = pricing.price_per_1m_output_tokens;
+                    document.getElementById('price-cached').value = pricing.price_per_1m_cached_tokens;
+                }
+            } catch (err) {
+                console.error("Failed to fetch pricing config", err);
+            }
+        }
+
+        async function handleSavePricing(e) {
+            e.preventDefault();
+            const priceInput = parseFloat(document.getElementById('price-input').value);
+            const priceOutput = parseFloat(document.getElementById('price-output').value);
+            const priceCached = parseFloat(document.getElementById('price-cached').value);
+            
+            const successDiv = document.getElementById('pricing-success');
+            const errorDiv = document.getElementById('pricing-error');
+            successDiv.classList.add('hidden');
+            errorDiv.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/api/admin/config/pricing', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': adminPassword
+                    },
+                    body: JSON.stringify({
+                        price_per_1m_input_tokens: priceInput,
+                        price_per_1m_output_tokens: priceOutput,
+                        price_per_1m_cached_tokens: priceCached
+                    })
+                });
+                
+                if (response.ok) {
+                    successDiv.innerText = "Model pricing updated successfully.";
+                    successDiv.classList.remove('hidden');
+                    // Refresh stats and keys usage representation
+                    fetchKeys();
+                } else {
+                    const err = await response.json();
+                    errorDiv.innerText = err.detail || "Failed to update model pricing.";
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.innerText = "Unable to connect to server.";
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        let tunnelPollInterval = null;
+
+        async function pollTunnelStatus() {
+            if (!adminPassword) return;
+            try {
+                const response = await fetch('/api/admin/tunnel/status', {
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+                if (!response.ok) return;
+                
+                const data = await response.json();
+                const badge = document.getElementById('tunnel-badge');
+                const dot = document.getElementById('tunnel-dot');
+                const text = document.getElementById('tunnel-status-text');
+                const btn = document.getElementById('tunnel-toggle-btn');
+                const progressContainer = document.getElementById('tunnel-progress-container');
+                const progressBar = document.getElementById('tunnel-progress-bar');
+                const progressPct = document.getElementById('tunnel-progress-pct');
+                const urlInput = document.getElementById('tunnel-url-input');
+                const copyBtn = document.getElementById('tunnel-copy-btn');
+                
+                if (data.binary_exists !== undefined) {
+                    tunnelBinaryExists = data.binary_exists;
+                }
+                
+                // Clear state classes
+                badge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border";
+                dot.className = "h-2.5 w-2.5 rounded-full";
+                
+                if (data.status === "stopped") {
+                    badge.classList.add("bg-slate-500/10", "text-slate-400", "border-slate-500/20");
+                    dot.classList.add("bg-slate-400");
+                    text.innerText = "Inactive";
+                    btn.innerText = "Enable Sharing";
+                    btn.className = "w-full py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-brand-600/15";
+                    progressContainer.classList.add("hidden");
+                    urlInput.value = "";
+                    urlInput.placeholder = "Tunnel is inactive";
+                    copyBtn.disabled = true;
+                } else if (data.status === "downloading") {
+                    badge.classList.add("bg-amber-500/10", "text-amber-400", "border-amber-500/20");
+                    dot.classList.add("bg-amber-400", "animate-pulse");
+                    text.innerText = "Downloading (" + data.progress + "%)";
+                    btn.innerText = "Disable Sharing";
+                    btn.className = "w-full py-3 border border-rose-500/30 hover:bg-rose-500/5 text-rose-400 rounded-xl text-sm font-semibold transition";
+                    
+                    progressContainer.classList.remove("hidden");
+                    progressBar.style.width = data.progress + "%";
+                    progressPct.innerText = data.progress + "%";
+                    
+                    urlInput.value = "";
+                    urlInput.placeholder = "Downloading engine...";
+                    copyBtn.disabled = true;
+                } else if (data.status === "starting") {
+                    badge.classList.add("bg-amber-500/10", "text-amber-400", "border-amber-500/20");
+                    dot.classList.add("bg-amber-400", "animate-pulse");
+                    text.innerText = "Starting";
+                    btn.innerText = "Disable Sharing";
+                    btn.className = "w-full py-3 border border-rose-500/30 hover:bg-rose-500/5 text-rose-400 rounded-xl text-sm font-semibold transition";
+                    progressContainer.classList.add("hidden");
+                    urlInput.value = "";
+                    urlInput.placeholder = "Starting tunnel...";
+                    copyBtn.disabled = true;
+                } else if (data.status === "active") {
+                    badge.classList.add("bg-emerald-500/10", "text-emerald-400", "border-emerald-500/20");
+                    dot.classList.add("bg-emerald-400", "animate-pulse");
+                    text.innerText = "Active";
+                    btn.innerText = "Disable Sharing";
+                    btn.className = "w-full py-3 border border-rose-500/30 hover:bg-rose-500/5 text-rose-400 rounded-xl text-sm font-semibold transition";
+                    progressContainer.classList.add("hidden");
+                    urlInput.value = data.url;
+                    copyBtn.disabled = false;
+                } else if (data.status === "error") {
+                    badge.classList.add("bg-rose-500/10", "text-rose-400", "border-rose-500/20");
+                    dot.classList.add("bg-rose-400");
+                    text.innerText = "Error";
+                    btn.innerText = "Enable Sharing";
+                    btn.className = "w-full py-3 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-xl text-sm font-semibold transition shadow-lg shadow-brand-600/15";
+                    progressContainer.classList.add("hidden");
+                    urlInput.value = "";
+                    urlInput.placeholder = data.error || "Tunnel error occurred.";
+                    copyBtn.disabled = true;
+                }
+            } catch (err) {
+                console.error("Failed to poll tunnel status", err);
+            }
+        }
+
+        async function toggleTunnel() {
+            const btn = document.getElementById('tunnel-toggle-btn');
+            btn.disabled = true;
+
+            try {
+                const statusRes = await fetch('/api/admin/tunnel/status', {
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+                if (!statusRes.ok) { btn.disabled = false; return; }
+                const statusData = await statusRes.json();
+
+                if (statusData.status === 'stopped' || statusData.status === 'error') {
+                    // Show the confirmation modal instead of starting immediately
+                    btn.disabled = false;
+                    openTunnelConfirmModal(statusData.binary_exists);
+                } else {
+                    // Already running — stop it directly
+                    const response = await fetch('/api/admin/tunnel/stop', {
+                        method: 'POST',
+                        headers: { 'X-Admin-Password': adminPassword }
+                    });
+                    if (response.ok) await pollTunnelStatus();
+                    btn.disabled = false;
+                }
+            } catch (err) {
+                console.error('Error toggling tunnel', err);
+                btn.disabled = false;
+            }
+        }
+
+        function openTunnelConfirmModal(binaryExists) {
+            const modal = document.getElementById('tunnel-confirm-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // Show the correct contextual banner
+            const downloadNotice = document.getElementById('tunnel-confirm-download-notice');
+            const cachedNotice   = document.getElementById('tunnel-confirm-cached-notice');
+            if (binaryExists) {
+                downloadNotice.classList.add('hidden');
+                cachedNotice.classList.remove('hidden');
+            } else {
+                cachedNotice.classList.add('hidden');
+                downloadNotice.classList.remove('hidden');
+            }
+        }
+
+        function closeTunnelConfirmModal() {
+            const modal = document.getElementById('tunnel-confirm-modal');
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+
+        async function confirmEnableTunnel() {
+            closeTunnelConfirmModal();
+            const btn = document.getElementById('tunnel-toggle-btn');
+            btn.disabled = true;
+            try {
+                const response = await fetch('/api/admin/tunnel/start', {
+                    method: 'POST',
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+                if (response.ok) await pollTunnelStatus();
+            } catch (err) {
+                console.error('Error starting tunnel', err);
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function copyTunnelUrl() {
+            const urlInput = document.getElementById('tunnel-url-input');
+            if (!urlInput.value) return;
+            
+            navigator.clipboard.writeText(urlInput.value).then(() => {
+                const btn = document.getElementById('tunnel-copy-btn');
+                const origIcon = btn.innerHTML;
+                btn.innerHTML = `
+                    <svg class="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                `;
+                setTimeout(() => {
+                    btn.innerHTML = origIcon;
+                }, 2000);
+            });
+        }
+
+        function renderCharts(keys) {
+            // Include active and revoked keys to represent complete historic totals
+            const activeKeys = keys.filter(k => k.total_tokens_used > 0 || (k.amount_spent && k.amount_spent > 0));
+            const sortedKeys = [...activeKeys].sort((a, b) => b.total_tokens_used - a.total_tokens_used);
+            
+            const labels = sortedKeys.map(k => k.name);
+            const tokensData = sortedKeys.map(k => k.total_tokens_used);
+            const costData = sortedKeys.map(k => k.amount_spent || 0.0);
+
+            // 1. Render Token Chart
+            const tokensCtx = document.getElementById('tokens-chart').getContext('2d');
+            if (tokensChart) {
+                tokensChart.destroy();
+            }
+            const backgroundColors = sortedKeys.map((_, i) => {
+                const colors = [
+                    'rgba(70, 102, 255, 0.75)',  // brand-500
+                    'rgba(124, 58, 237, 0.75)',  // violet-600
+                    'rgba(99, 102, 241, 0.75)',  // indigo-500
+                    'rgba(16, 185, 129, 0.75)',  // emerald-500
+                    'rgba(245, 158, 11, 0.75)',  // amber-500
+                    'rgba(239, 68, 68, 0.75)',    // rose-500
+                    'rgba(6, 182, 212, 0.75)',   // cyan-500
+                ];
+                return colors[i % colors.length];
+            });
+            const borderColors = backgroundColors.map(c => c.replace('0.75', '1'));
+
+            tokensChart = new Chart(tokensCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels.length ? labels : ['No Usage'],
+                    datasets: [{
+                        data: tokensData.length ? tokensData : [0],
+                        backgroundColor: backgroundColors.length ? backgroundColors : ['rgba(255, 255, 255, 0.05)'],
+                        borderColor: borderColors.length ? borderColors : ['rgba(255, 255, 255, 0.1)'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: {
+                                color: '#94a3b8',
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 2. Render Cost Chart
+            const costCtx = document.getElementById('cost-chart').getContext('2d');
+            if (costChart) {
+                costChart.destroy();
+            }
+            costChart = new Chart(costCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels.length ? labels : ['No Usage'],
+                    datasets: [{
+                        label: 'USD Spend ($)',
+                        data: costData.length ? costData : [0],
+                        backgroundColor: backgroundColors.length ? backgroundColors : ['rgba(255, 255, 255, 0.05)'],
+                        borderColor: borderColors.length ? borderColors : ['rgba(255, 255, 255, 0.1)'],
+                        borderWidth: 1,
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#94a3b8'
+                            }
+                        },
+                        y: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#94a3b8',
+                                callback: function(value) {
+                                    return '$' + value.toFixed(4);
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function fetchKeys() {
+            const tableBody = document.getElementById('keys-table-body');
+            const noKeysView = document.getElementById('no-keys-view');
+            
+            const revokedTableBody = document.getElementById('revoked-keys-table-body');
+            const noRevokedKeysView = document.getElementById('no-revoked-keys-view');
+            
+            const connBadge = document.getElementById('conn-badge');
+
+            try {
+                const response = await fetch('/api/admin/keys', {
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+
+                if (response.status === 401) {
+                    logout();
+                    return;
+                }
+
+                if (!response.ok) throw new Error('Fetch failed');
+
+                const keys = await response.json();
+                keysList = keys;
+                connBadge.innerHTML = '<span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span> Connected';
+                connBadge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+
+                // Filter keys
+                const activeKeys = keys.filter(k => !k.revoked);
+                const revokedKeys = keys.filter(k => k.revoked);
+
+                // Update summary stats (registered stats ignore revoked; cumulative spent/tokens include all records)
+                document.getElementById('stat-total-keys').innerText = activeKeys.length;
+                document.getElementById('stat-active-keys').innerText = activeKeys.filter(k => 
+                    k.active && 
+                    (k.token_cap === -1 || k.total_tokens_used < k.token_cap) &&
+                    (k.amount_cap === -1.0 || k.amount_spent < k.amount_cap)
+                ).length;
+                document.getElementById('stat-total-tokens').innerText = keys.reduce((acc, k) => acc + k.total_tokens_used, 0).toLocaleString();
+                document.getElementById('stat-total-spend').innerText = '$' + keys.reduce((acc, k) => acc + (k.amount_spent || 0.0), 0.0).toFixed(4);
+
+                // Render Active Keys Table
+                if (activeKeys.length === 0) {
+                    tableBody.innerHTML = '';
+                    noKeysView.classList.remove('hidden');
+                } else {
+                    noKeysView.classList.add('hidden');
+                    let html = '';
+                    activeKeys.forEach(k => {
+                        const isCapped = k.token_cap !== -1;
+                        const isTokenExceeded = isCapped && k.total_tokens_used >= k.token_cap;
+                        
+                        const isAmountCapped = k.amount_cap !== -1.0;
+                        const isAmountExceeded = isAmountCapped && k.amount_spent >= k.amount_cap;
+                        
+                        const isLimitExceeded = isTokenExceeded || isAmountExceeded;
+                        
+                        let usagePercentage = 0;
+                        if (isCapped) {
+                            usagePercentage = Math.min(100, Math.round((k.total_tokens_used / k.token_cap) * 100));
+                        }
+
+                        let amountUsagePercentage = 0;
+                        if (isAmountCapped) {
+                            amountUsagePercentage = Math.min(100, Math.round(((k.amount_spent || 0) / k.amount_cap) * 100));
+                        }
+
+                        // Progress bar coloring
+                        let barColor = 'bg-brand-500';
+                        if (usagePercentage > 90) barColor = 'bg-rose-500';
+                        else if (usagePercentage > 75) barColor = 'bg-amber-500';
+
+                        let amountBarColor = 'bg-emerald-500';
+                        if (amountUsagePercentage > 90) amountBarColor = 'bg-rose-500';
+                        else if (amountUsagePercentage > 75) amountBarColor = 'bg-amber-500';
+
+                        const capDisplay = isCapped ? k.token_cap.toLocaleString() : 'Unlimited';
+                        const progressHtml = isCapped ? `
+                            <div class="w-full mt-2">
+                                <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                    <span>${usagePercentage}% of Cap</span>
+                                    <span>${k.total_tokens_used.toLocaleString()} / ${capDisplay}</span>
+                                </div>
+                                <div class="w-full bg-white/5 rounded-full h-1.5 overflow-hidden border border-white/5">
+                                    <div class="${barColor} h-full rounded-full" style="width: ${usagePercentage}%"></div>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="mt-2 text-xs text-slate-400">
+                                No token limit (${k.total_tokens_used.toLocaleString()} used)
+                            </div>
+                        `;
+
+                        const amountCapDisplay = isAmountCapped ? `$${k.amount_cap.toFixed(4)}` : 'Unlimited';
+                        const amountProgressHtml = isAmountCapped ? `
+                            <div class="w-full mt-2">
+                                <div class="flex justify-between text-[11px] text-slate-400 mb-1">
+                                    <span>${amountUsagePercentage}% of Cap</span>
+                                    <span>$${(k.amount_spent || 0).toFixed(4)} / ${amountCapDisplay}</span>
+                                </div>
+                                <div class="w-full bg-white/5 rounded-full h-1.5 overflow-hidden border border-white/5">
+                                    <div class="${amountBarColor} h-full rounded-full" style="width: ${amountUsagePercentage}%"></div>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="mt-2 text-xs text-slate-400">
+                                No budget limit ($${(k.amount_spent || 0).toFixed(4)} spent)
+                            </div>
+                        `;
+
+                        let statusBadge = '<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>';
+                        if (isLimitExceeded) {
+                            statusBadge = '<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">Exceeded</span>';
+                        }
+
+                        const promptTokens = k.prompt_tokens_used || 0;
+                        const completionTokens = k.completion_tokens_used || 0;
+                        const cachedTokens = k.cached_tokens_used || 0;
+
+                        const tokenBifurcationHtml = `
+                            <div class="font-mono text-xs text-slate-400 space-y-0.5">
+                                <div>In: <span class="text-slate-300 font-semibold">${promptTokens.toLocaleString()}</span></div>
+                                <div>Out: <span class="text-slate-300 font-semibold">${completionTokens.toLocaleString()}</span></div>
+                                <div class="text-indigo-400">Cache: <span class="font-semibold">${cachedTokens.toLocaleString()}</span></div>
+                            </div>
+                        `;
+
+                        html += `
+                            <tr class="hover:bg-white/[0.01] transition">
+                                <td class="px-6 py-4 font-semibold text-white max-w-[150px] truncate">${escapeHtml(k.name)}</td>
+                                <td class="px-6 py-4 font-mono text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <span id="key-text-${k.key}" class="text-slate-400 select-all select-none">••••••••••••••••••••••••</span>
+                                        <button onclick="toggleKeyReveal('${k.key}')" class="p-1 rounded hover:bg-white/5 text-slate-400 hover:text-white transition" title="Show/Hide">
+                                            <svg id="eye-icon-${k.key}" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                        </button>
+                                        <button onclick="copyToClipboard('${k.key}')" class="p-1 rounded hover:bg-white/5 text-slate-400 hover:text-white transition" title="Copy Key">
+                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 max-w-[200px]">${progressHtml}</td>
+                                <td class="px-6 py-4 max-w-[200px]">${amountProgressHtml}</td>
+                                <td class="px-6 py-4">${tokenBifurcationHtml}</td>
+                                <td class="px-6 py-4 text-center">${statusBadge}</td>
+                                <td class="px-6 py-4 text-right">
+                                    <div class="flex justify-end gap-2">
+                                        <button onclick="openCapModal('${k.key}', ${k.token_cap}, ${k.amount_cap})" class="px-2.5 py-1.5 text-xs font-semibold bg-white/5 rounded-lg border border-white/5 hover:bg-white/10 hover:border-white/10 transition text-slate-300">
+                                            Cap
+                                        </button>
+                                        <button onclick="rotateKey('${k.key}')" class="px-2.5 py-1.5 text-xs font-semibold bg-white/5 text-slate-300 rounded-lg border border-white/5 hover:bg-white/10 transition">
+                                            Rotate
+                                        </button>
+                                        <button onclick="resetUsage('${k.key}')" class="px-2.5 py-1.5 text-xs font-semibold bg-indigo-500/10 text-indigo-400 rounded-lg border border-indigo-500/10 hover:bg-indigo-500/20 transition">
+                                            Reset
+                                        </button>
+                                        <button onclick="revokeKey('${k.key}')" class="px-2.5 py-1.5 text-xs font-semibold bg-rose-500/10 text-rose-400 rounded-lg border border-rose-500/10 hover:bg-rose-500/20 transition">
+                                            Revoke
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    tableBody.innerHTML = html;
+                }
+
+                // Render Revoked Keys Table
+                if (revokedKeys.length === 0) {
+                    revokedTableBody.innerHTML = '';
+                    noRevokedKeysView.classList.remove('hidden');
+                } else {
+                    noRevokedKeysView.classList.add('hidden');
+                    let revokedHtml = '';
+                    revokedKeys.forEach(k => {
+                        revokedHtml += `
+                            <tr class="hover:bg-white/[0.01] transition text-slate-400">
+                                <td class="px-6 py-4 font-semibold text-slate-300 max-w-[150px] truncate">${escapeHtml(k.name)}</td>
+                                <td class="px-6 py-4 font-mono text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <span id="key-text-${k.key}" class="text-slate-400 select-all select-none">••••••••••••••••••••••••</span>
+                                        <button onclick="toggleKeyReveal('${k.key}')" class="p-1 rounded hover:bg-white/5 text-slate-400 hover:text-white transition" title="Show/Hide">
+                                            <svg id="eye-icon-${k.key}" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4">${k.total_tokens_used.toLocaleString()}</td>
+                                <td class="px-6 py-4">$${(k.amount_spent || 0).toFixed(4)}</td>
+                                <td class="px-6 py-4 text-center">
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">Revoked</span>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    revokedTableBody.innerHTML = revokedHtml;
+                }
+
+                // Update charts
+                renderCharts(keys);
+            } catch (err) {
+                connBadge.innerHTML = '<span class="h-2 w-2 rounded-full bg-rose-400"></span> Disconnected';
+                connBadge.className = "flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20";
+                console.error(err);
+            }
+        }
+
+        // Reveal/Hide Key String
+        function toggleKeyReveal(key) {
+            const keySpan = document.getElementById(`key-text-${key}`);
+            const eyeIcon = document.getElementById(`eye-icon-${key}`);
+            
+            if (keySpan.innerText.includes('••••')) {
+                keySpan.innerText = key;
+                keySpan.classList.remove('select-none');
+                eyeIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.542-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                `;
+            } else {
+                keySpan.innerText = '••••••••••••••••••••••••';
+                keySpan.classList.add('select-none');
+                eyeIcon.innerHTML = `
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                `;
+            }
+        }
+
+        // Copy Key to Clipboard
+        function copyToClipboard(key) {
+            navigator.clipboard.writeText(key).then(() => {
+                alert('API key copied to clipboard!');
+            }).catch(err => {
+                alert('Failed to copy to clipboard.');
+            });
+        }
+
+        // Create Key Modal Trigger
+        function openCreateModal() {
+            document.getElementById('create-modal').classList.remove('hidden');
+            document.getElementById('create-modal').classList.add('flex');
+            document.getElementById('new-key-name').value = '';
+            document.getElementById('new-key-cap-type').value = 'unlimited';
+            document.getElementById('new-key-cap-container').classList.add('hidden');
+            document.getElementById('new-key-cap-val').value = '';
+            document.getElementById('new-key-amount-cap-type').value = 'unlimited';
+            document.getElementById('new-key-amount-cap-container').classList.add('hidden');
+            document.getElementById('new-key-amount-cap-val').value = '';
+            document.getElementById('create-error').classList.add('hidden');
+        }
+
+        function closeCreateModal() {
+            document.getElementById('create-modal').classList.remove('flex');
+            document.getElementById('create-modal').classList.add('hidden');
+        }
+
+        function toggleCapLimitInput() {
+            const selectVal = document.getElementById('new-key-cap-type').value;
+            const container = document.getElementById('new-key-cap-container');
+            if (selectVal === 'capped') {
+                container.classList.remove('hidden');
+                document.getElementById('new-key-cap-val').required = true;
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('new-key-cap-val').required = false;
+            }
+        }
+
+        function toggleAmountCapLimitInput() {
+            const selectVal = document.getElementById('new-key-amount-cap-type').value;
+            const container = document.getElementById('new-key-amount-cap-container');
+            if (selectVal === 'capped') {
+                container.classList.remove('hidden');
+                document.getElementById('new-key-amount-cap-val').required = true;
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('new-key-amount-cap-val').required = false;
+            }
+        }
+
+        async function handleCreateKey(e) {
+            e.preventDefault();
+            const name = document.getElementById('new-key-name').value.trim();
+            const capType = document.getElementById('new-key-cap-type').value;
+            const capVal = document.getElementById('new-key-cap-val').value;
+            const amountCapType = document.getElementById('new-key-amount-cap-type').value;
+            const amountCapVal = document.getElementById('new-key-amount-cap-val').value;
+            const errorDiv = document.getElementById('create-error');
+            errorDiv.classList.add('hidden');
+
+            const tokenCap = capType === 'unlimited' ? -1 : parseInt(capVal);
+            const amountCap = amountCapType === 'unlimited' ? -1.0 : parseFloat(amountCapVal);
+
+            try {
+                const response = await fetch('/api/admin/keys', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': adminPassword
+                    },
+                    body: JSON.stringify({ name: name, token_cap: tokenCap, amount_cap: amountCap })
+                });
+
+                if (response.ok) {
+                    closeCreateModal();
+                    fetchKeys();
+                } else {
+                    const err = await response.json();
+                    errorDiv.innerText = err.detail || 'Failed to create key.';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.innerText = 'Unable to connect to server.';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        // Cap Modal Trigger
+        function openCapModal(key, currentCap, currentAmountCap) {
+            document.getElementById('cap-modal').classList.remove('hidden');
+            document.getElementById('cap-modal').classList.add('flex');
+            document.getElementById('edit-cap-key').value = key;
+            document.getElementById('cap-error').classList.add('hidden');
+
+            const record = keysList.find(k => k.key === key);
+            document.getElementById('cap-modal-subtitle').innerText = `Update budget caps for client "${record.name}"`;
+
+            if (currentCap === -1) {
+                document.getElementById('edit-key-cap-type').value = 'unlimited';
+                document.getElementById('edit-key-cap-container').classList.add('hidden');
+                document.getElementById('edit-key-cap-val').value = '';
+            } else {
+                document.getElementById('edit-key-cap-type').value = 'capped';
+                document.getElementById('edit-key-cap-container').classList.remove('hidden');
+                document.getElementById('edit-key-cap-val').value = currentCap;
+            }
+
+            if (currentAmountCap === -1.0) {
+                document.getElementById('edit-key-amount-cap-type').value = 'unlimited';
+                document.getElementById('edit-key-amount-cap-container').classList.add('hidden');
+                document.getElementById('edit-key-amount-cap-val').value = '';
+            } else {
+                document.getElementById('edit-key-amount-cap-type').value = 'capped';
+                document.getElementById('edit-key-amount-cap-container').classList.remove('hidden');
+                document.getElementById('edit-key-amount-cap-val').value = currentAmountCap;
+            }
+        }
+
+        function closeCapModal() {
+            document.getElementById('cap-modal').classList.remove('flex');
+            document.getElementById('cap-modal').classList.add('hidden');
+        }
+
+        function toggleEditCapLimitInput() {
+            const selectVal = document.getElementById('edit-key-cap-type').value;
+            const container = document.getElementById('edit-key-cap-container');
+            if (selectVal === 'capped') {
+                container.classList.remove('hidden');
+                document.getElementById('edit-key-cap-val').required = true;
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('edit-key-cap-val').required = false;
+            }
+        }
+
+        function toggleEditAmountCapLimitInput() {
+            const selectVal = document.getElementById('edit-key-amount-cap-type').value;
+            const container = document.getElementById('edit-key-amount-cap-container');
+            if (selectVal === 'capped') {
+                container.classList.remove('hidden');
+                document.getElementById('edit-key-amount-cap-val').required = true;
+            } else {
+                container.classList.add('hidden');
+                document.getElementById('edit-key-amount-cap-val').required = false;
+            }
+        }
+
+        async function handleUpdateCap(e) {
+            e.preventDefault();
+            const key = document.getElementById('edit-cap-key').value;
+            
+            const capType = document.getElementById('edit-key-cap-type').value;
+            const capVal = document.getElementById('edit-key-cap-val').value;
+            
+            const amountCapType = document.getElementById('edit-key-amount-cap-type').value;
+            const amountCapVal = document.getElementById('edit-key-amount-cap-val').value;
+            
+            const errorDiv = document.getElementById('cap-error');
+            errorDiv.classList.add('hidden');
+
+            const tokenCap = capType === 'unlimited' ? -1 : parseInt(capVal);
+            const amountCap = amountCapType === 'unlimited' ? -1.0 : parseFloat(amountCapVal);
+
+            try {
+                const response = await fetch(`/api/admin/keys/${encodeURIComponent(key)}/cap`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Admin-Password': adminPassword
+                    },
+                    body: JSON.stringify({ token_cap: tokenCap, amount_cap: amountCap })
+                });
+
+                if (response.ok) {
+                    closeCapModal();
+                    fetchKeys();
+                } else {
+                    const err = await response.json();
+                    errorDiv.innerText = err.detail || 'Failed to update caps.';
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.innerText = 'Unable to connect to server.';
+                errorDiv.classList.remove('hidden');
+            }
+        }
+
+        // Rotate API Key
+        async function rotateKey(key) {
+            const record = keysList.find(k => k.key === key);
+            if (!confirm(`Are you sure you want to regenerate and rotate the API secret key for client "${record.name}"? Active connections will need to update their Authorization header. Usage statistics will be preserved.`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/keys/${encodeURIComponent(key)}/rotate`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    alert(`API key rotated successfully!\n\nNew Key: ${data.new_key}\n\nPlease copy this key immediately as it will be masked on subsequent page reloads.`);
+                    fetchKeys();
+                } else {
+                    const err = await response.json();
+                    alert(err.detail || 'Failed to rotate API key.');
+                }
+            } catch (err) {
+                alert('Connection failure.');
+            }
+        }
+
+        // Reset Usage
+        async function resetUsage(key) {
+            const record = keysList.find(k => k.key === key);
+            if (!confirm(`Are you sure you want to reset all token usage counters and amount spent back to zero for client "${record.name}"? This will clear active metrics but keep the same API key string.`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/keys/${encodeURIComponent(key)}/reset`, {
+                    method: 'POST',
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+
+                if (response.ok) {
+                    fetchKeys();
+                } else {
+                    const err = await response.json();
+                    alert(err.detail || 'Failed to reset usage.');
+                }
+            } catch (err) {
+                alert('Connection failure.');
+            }
+        }
+
+        // Revoke Key
+        async function revokeKey(key) {
+            const record = keysList.find(k => k.key === key);
+            if (!confirm(`WARNING: Are you sure you want to revoke and delete the API Key for client "${record.name}"? This action cannot be undone.`)) return;
+
+            try {
+                const response = await fetch(`/api/admin/keys/${encodeURIComponent(key)}`, {
+                    method: 'DELETE',
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+
+                if (response.ok) {
+                    fetchKeys();
+                } else {
+                    const err = await response.json();
+                    alert(err.detail || 'Failed to revoke key.');
+                }
+            } catch (err) {
+                alert('Connection failure.');
+            }
+        }
+
+        // HTML escaping helper
+        function escapeHtml(str) {
+            return str
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>

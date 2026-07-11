@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mlx-inference-server"
+version = "1.0.0"
+description = "A production-quality LLM inference server optimized for Apple Silicon using MLX"
+readme = "README.md"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: MacOS",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+dependencies = [
+    "fastapi>=0.116",
+    "uvicorn[standard]>=0.35",
+    "mlx-lm>=0.28",
+    "mlx>=0.28",
+    "huggingface-hub>=0.34",
+    "transformers>=4.46.0,<5.0.0",
+    "pydantic>=2.11",
+    "pydantic-settings>=2.7",
+    "orjson>=3.11",
+    "numpy>=2.3",
+    "sse-starlette>=3.0",
+    "python-dotenv>=1.1",
+    "httpx>=0.28",
+    "prometheus-client>=0.23"
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23"
+]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = "-ra -q --asyncio-mode=auto"
+testpaths = [
+    "tests"
+]
+python_files = "test_*.py"

@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  mlx-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mlx-inference-server:latest
+    container_name: mlx-inference-server
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_NAME=mlx-community/Qwen2.5-3B-Instruct-4bit
+      - HOST=0.0.0.0
+      - PORT=8000
+      - TEMPERATURE=0.7
+      - TOP_P=0.9
+      - MAX_TOKENS=2048
+      - BATCHING_WINDOW_MS=25
+      - MAX_BATCH_SIZE=16
+      - LOGGING_LEVEL=INFO
+      - METRICS_ENABLED=true
+      # Security
+      - ADMIN_PASSWORD=admin123
+      - API_KEY=
+      # Token Pricing (USD per 1,000,000 tokens)
+      - PRICE_PER_1M_INPUT_TOKENS=0.15
+      - PRICE_PER_1M_OUTPUT_TOKENS=0.60
+      - PRICE_PER_1M_CACHED_TOKENS=0.075
+    volumes:
+      # Persist the cloudflared binary across container restarts
+      - ./bin:/app/bin
+    restart: unless-stopped
