@@ -164,3 +164,21 @@ async def stop_tunnel_connection():
     """
     return tunnel_manager.stop_tunnel()
 
+
+@router.get("/logs", dependencies=[Depends(verify_admin_password)])
+async def get_admin_logs(limit: int = 50, offset: int = 0, status: Optional[str] = None, client: Optional[str] = None):
+    """
+    Returns paginated request logs from MongoDB.
+    """
+    from app.core.mongodb import mongodb_manager
+    return await mongodb_manager.get_request_logs(limit=limit, offset=offset, status_filter=status, client_filter=client)
+
+
+@router.get("/stats", dependencies=[Depends(verify_admin_password)])
+async def get_admin_stats():
+    """
+    Returns aggregated stats from MongoDB.
+    """
+    from app.core.mongodb import mongodb_manager
+    return await mongodb_manager.get_stats()
+

@@ -37,6 +37,38 @@ class ConfigManager:
             else:
                 self._load_defaults()
 
+    async def init_store_async(self) -> None:
+        from app.core.mongodb import mongodb_manager
+        if mongodb_manager.enabled and mongodb_manager.db is not None:
+            try:
+                doc = await mongodb_manager.db["config"].find_one({"_id": "pricing"})
+                if doc:
+                    data = {k: v for k, v in doc.items() if k != "_id"}
+                    with self.lock:
+                        self.pricing = ModelPricingConfig(**data)
+                    logger.info("Loaded model pricing config from MongoDB: %s", self.pricing)
+                    return
+                else:
+                    # Initialize default values in MongoDB
+                    with self.lock:
+                        self.pricing = ModelPricingConfig(
+                            price_per_1m_input_tokens=settings.price_per_1m_input_tokens,
+                            price_per_1m_output_tokens=settings.price_per_1m_output_tokens,
+                            price_per_1m_cached_tokens=settings.price_per_1m_cached_tokens
+                        )
+                    await mongodb_manager.db["config"].replace_one(
+                        {"_id": "pricing"},
+                        {"_id": "pricing", **self.pricing.model_dump()},
+                        upsert=True
+                    )
+                    logger.info("Initialized default pricing config in MongoDB.")
+                    return
+            except Exception as e:
+                logger.error("Failed to load config from MongoDB: %s. Falling back to file store.", str(e))
+        
+        # Fallback to sync file loading
+        self.init_store()
+
     def _load_defaults(self) -> None:
         self.pricing = ModelPricingConfig(
             price_per_1m_input_tokens=settings.price_per_1m_input_tokens,
@@ -47,6 +79,10 @@ class ConfigManager:
         logger.info("Initialized default pricing config.")
 
     def _save_unlocked(self) -> None:
+        from app.core.mongodb import mongodb_manager
+        if mongodb_manager.enabled:
+            return
+            
         try:
             with open(self.filepath, "w", encoding="utf-8") as f:
                 json.dump(self.pricing.model_dump(), f, indent=4)
@@ -81,6 +117,23 @@ class ConfigManager:
             )
             self._save_unlocked()
             logger.info("Updated dynamic model pricing: %s", self.pricing)
+            
+            # If MongoDB is enabled, update it in the database
+            from app.core.mongodb import mongodb_manager
+            if mongodb_manager.enabled:
+                rec_dict = self.pricing.model_dump()
+                async def _db_update():
+                    try:
+                        await mongodb_manager.db["config"].replace_one(
+                            {"_id": "pricing"},
+                            {"_id": "pricing", **rec_dict},
+                            upsert=True
+                        )
+                        logger.info("Persisted pricing config to MongoDB.")
+                    except Exception as e:
+                        logger.error("Failed to persist pricing config to MongoDB: %s", str(e))
+                mongodb_manager.run_async(_db_update())
+                
             return self.pricing
 
 

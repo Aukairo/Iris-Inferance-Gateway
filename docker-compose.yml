@@ -27,7 +27,24 @@ services:
       - PRICE_PER_1M_INPUT_TOKENS=0.15
       - PRICE_PER_1M_OUTPUT_TOKENS=0.60
       - PRICE_PER_1M_CACHED_TOKENS=0.075
+      # MongoDB Configuration
+      - MONGODB_URI=mongodb://mongo:27017
+      - MONGODB_DB=iris_engine
     volumes:
       # Persist the cloudflared binary across container restarts
       - ./bin:/app/bin
     restart: unless-stopped
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:6.0
+    container_name: mongo-db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo-data:

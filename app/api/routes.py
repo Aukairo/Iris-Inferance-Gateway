@@ -2,7 +2,7 @@ import time
 import uuid
 import asyncio
 import resource
-from typing import Union, Any
+from typing import Union, Any, List, Dict
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import Response, StreamingResponse
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -48,6 +48,89 @@ def get_content_as_str(content: Any) -> str:
     return str(content)
 
 
+def normalize_messages(messages: List[Any]) -> List[Dict[str, Any]]:
+    """
+    Normalizes a list of ChatMessage objects for tokenizers with strict role alternation
+    and content type checks (like Gemma-3):
+    1. Extracts and keeps the system message at the beginning.
+    2. Converts tool responses to 'user' role with formatted content.
+    3. Handles assistant tool_calls, formatting tool_calls into the content text.
+    4. Merges consecutive messages of the same role to guarantee strict user/assistant alternation.
+    5. Ensures content is always a valid string (never None).
+    """
+    if not messages:
+        return []
+
+    system_message = None
+    processed = []
+
+    for msg in messages:
+        role = msg.role
+        content = get_content_as_str(msg.content)
+        
+        # Get extra attributes (in case of tool_calls or name)
+        tool_calls = getattr(msg, "tool_calls", None) or (msg.model_extra.get("tool_calls") if msg.model_extra else None)
+        name = getattr(msg, "name", None) or (msg.model_extra.get("name") if msg.model_extra else None)
+
+        # Extract system message
+        if role == "system":
+            system_message = {"role": "system", "content": content}
+            continue
+
+        # Format assistant tool calls into the content text if present
+        if role == "assistant" and tool_calls:
+            tool_calls_text = []
+            for tc in tool_calls:
+                if isinstance(tc, dict):
+                    func = tc.get("function", {})
+                else:
+                    func = getattr(tc, "function", {})
+
+                if isinstance(func, dict):
+                    name = func.get("name", "unknown")
+                    args = func.get("arguments", "{}")
+                else:
+                    name = getattr(func, "name", "unknown")
+                    args = getattr(func, "arguments", "{}")
+                tool_calls_text.append(f"[Call Tool: {name}({args})]")
+            
+            calls_str = "\n".join(tool_calls_text)
+            if content:
+                content = f"{content}\n\n{calls_str}"
+            else:
+                content = calls_str
+
+        # Format tool response messages as user role
+        if role == "tool":
+            tool_name = name or "tool"
+            content = f"[Tool Response for '{tool_name}']:\n{content}"
+            role = "user"
+
+        # Safe fallback for any other roles
+        if role not in ["user", "assistant"]:
+            role = "user"
+
+        processed.append({"role": role, "content": content})
+
+    # Merge consecutive messages of the same role
+    merged = []
+    for msg in processed:
+        if not merged:
+            merged.append(msg)
+        else:
+            last = merged[-1]
+            if last["role"] == msg["role"]:
+                last["content"] = f"{last['content']}\n\n{msg['content']}"
+            else:
+                merged.append(msg)
+
+    # Re-insert the system message at the start if it existed
+    if system_message:
+        merged.insert(0, system_message)
+
+    return merged
+
+
 @router.post(
     "/v1/chat/completions",
     response_model=Union[ChatCompletionResponse, Any],  # StreamingResponse or ChatCompletionResponse
@@ -73,20 +156,51 @@ async def chat_completions(
         )
 
     # Validate and tokenize the prompt messages using tokenizer chat template
+    # First, try to apply the template natively (needed for models supporting native tool calls)
     try:
-        messages_dicts = [{"role": m.role, "content": get_content_as_str(m.content)} for m in request.messages]
-        # apply_chat_template applies the prompt format and returns token ids
+        messages_dicts = []
+        for m in request.messages:
+            dict_msg = {"role": m.role}
+            content = get_content_as_str(m.content)
+            if content is not None:
+                dict_msg["content"] = content
+            
+            tool_calls = getattr(m, "tool_calls", None) or (m.model_extra.get("tool_calls") if m.model_extra else None)
+            name = getattr(m, "name", None) or (m.model_extra.get("name") if m.model_extra else None)
+            if tool_calls:
+                dict_msg["tool_calls"] = tool_calls
+            if name:
+                dict_msg["name"] = name
+            
+            if "content" not in dict_msg:
+                dict_msg["content"] = None
+                
+            messages_dicts.append(dict_msg)
+
         prompt_tokens = model_wrapper.tokenizer.apply_chat_template(
             messages_dicts,
             tokenize=True,
             add_generation_prompt=True
         )
-    except Exception as e:
-        logger.error("Failed to tokenize chat completion messages: %s", str(e))
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to tokenize prompt: {str(e)}"
+    except Exception as raw_err:
+        logger.warning(
+            "Tokenizer failed to apply native chat template: %s. Falling back to role normalization.",
+            str(raw_err)
         )
+        try:
+            # Fallback: Normalize messages to guarantee strict user/assistant alternation and text content compatibility
+            messages_dicts = normalize_messages(request.messages)
+            prompt_tokens = model_wrapper.tokenizer.apply_chat_template(
+                messages_dicts,
+                tokenize=True,
+                add_generation_prompt=True
+            )
+        except Exception as norm_err:
+            logger.error("Failed to tokenize chat completion messages even after normalization: %s", str(norm_err))
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Failed to tokenize prompt: {str(norm_err)}"
+            )
 
     # Prepare parameters (fallback to config defaults)
     temperature = request.temperature if request.temperature is not None else settings.temperature
@@ -109,7 +223,8 @@ async def chat_completions(
         top_p=top_p,
         response_queue=response_queue,
         loop=loop,
-        api_key=api_key
+        api_key=api_key,
+        messages=messages_dicts
     )
 
     # Queue request for dynamic batch scheduler
@@ -137,6 +252,27 @@ async def chat_completions(
         except Exception as e:
             logger.error("Exception occurred while awaiting completion: %s", str(e))
             request_ctx.cancelled = True
+            try:
+                from app.core.mongodb import mongodb_manager
+                latency_ms = int((time.perf_counter() - request_ctx.time_queued) * 1000)
+                asyncio.create_task(
+                    mongodb_manager.save_request_log(
+                        request_id=request_id,
+                        api_key=api_key,
+                        model=model_wrapper.model_name or "mlx-model",
+                        prompt=messages_dicts,
+                        response=None,
+                        prompt_tokens=len(prompt_tokens),
+                        completion_tokens=request_ctx.completion_tokens,
+                        cached_tokens=request_ctx.cached_tokens,
+                        latency_ms=latency_ms,
+                        stream=False,
+                        status="error",
+                        error_message=str(e)
+                    )
+                )
+            except Exception as log_err:
+                logger.error("Error logging request failure: %s", str(log_err))
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Inference execution failed: {str(e)}"
@@ -162,6 +298,29 @@ async def chat_completions(
                 total_tokens=prompt_len + completion_len
             )
         )
+
+        # Log successful completion to MongoDB in background
+        try:
+            from app.core.mongodb import mongodb_manager
+            latency_ms = int((time.perf_counter() - request_ctx.time_queued) * 1000)
+            asyncio.create_task(
+                mongodb_manager.save_request_log(
+                    request_id=request_id,
+                    api_key=api_key,
+                    model=model_wrapper.model_name or "mlx-model",
+                    prompt=messages_dicts,
+                    response=full_text,
+                    prompt_tokens=prompt_len,
+                    completion_tokens=completion_len,
+                    cached_tokens=request_ctx.cached_tokens,
+                    latency_ms=latency_ms,
+                    stream=False,
+                    status="success"
+                )
+            )
+        except Exception as log_err:
+            logger.error("Error logging request success: %s", str(log_err))
+
         return response_payload
 
 

@@ -89,7 +89,7 @@
     <main class="flex-1 max-w-7xl w-full mx-auto p-6 md:p-12 space-y-8">
         
         <!-- Summary Cards -->
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
             <!-- Card 1 -->
             <div class="glass-panel rounded-2xl p-6 flex items-center gap-5">
                 <div class="p-4 rounded-xl bg-brand-500/10 text-brand-400 border border-brand-500/20">
@@ -136,6 +136,18 @@
                 <div>
                     <p class="text-sm text-slate-400 font-medium">Cumulative Spend</p>
                     <h3 id="stat-total-spend" class="text-2xl font-bold mt-1">$0.0000</h3>
+                </div>
+            </div>
+            <!-- Card 5 -->
+            <div class="glass-panel rounded-2xl p-6 flex items-center gap-5">
+                <div class="p-4 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-slate-400 font-medium">Total Requests</p>
+                    <h3 id="stat-total-requests" class="text-2xl font-bold mt-1">0</h3>
                 </div>
             </div>
         </section>
@@ -305,6 +317,74 @@
             
             <div id="no-revoked-keys-view" class="hidden py-12 text-center text-slate-500 text-xs">
                 No deactivated/revoked API keys found in system.
+            </div>
+        </section>
+
+        <!-- Request History & MongoDB Logs Panel -->
+        <section class="glass-panel rounded-2xl overflow-hidden shadow-2xl">
+            <div class="px-6 py-5 border-b border-white/5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white/[0.01]">
+                <div>
+                    <h2 class="text-lg font-bold tracking-tight text-white">Request History & Logs</h2>
+                    <p class="text-xs text-slate-400 mt-1">Audit user prompts, completions, tokens, and response latencies saved in MongoDB.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                    <!-- Status Filter -->
+                    <select id="log-filter-status" onchange="fetchLogs(0)" class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300 focus:outline-none">
+                        <option value="" class="bg-slate-900 text-slate-300">All Statuses</option>
+                        <option value="success" class="bg-slate-900 text-slate-300">Success</option>
+                        <option value="cancelled" class="bg-slate-900 text-slate-300">Cancelled</option>
+                        <option value="error" class="bg-slate-900 text-slate-300">Error</option>
+                    </select>
+                    <!-- Client/Key Filter -->
+                    <select id="log-filter-client" onchange="fetchLogs(0)" class="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300 focus:outline-none">
+                        <option value="" class="bg-slate-900 text-slate-300">All Clients</option>
+                        <!-- Loaded dynamically -->
+                    </select>
+                    <button onclick="fetchLogs(currentLogsOffset); fetchStats();" class="px-3 py-2 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl text-xs font-semibold transition border border-white/10 flex items-center gap-1.5">
+                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M9 11l3-3m0 0l3 3m-3-3v12" />
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
+            </div>
+
+            <!-- Logs Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="text-xs text-slate-400 uppercase font-semibold border-b border-white/5 bg-white/[0.005]">
+                            <th class="px-6 py-4">Req #</th>
+                            <th class="px-6 py-4">Timestamp</th>
+                            <th class="px-6 py-4">Client</th>
+                            <th class="px-6 py-4">Model / Type</th>
+                            <th class="px-6 py-4">Tokens (In/Out/Total)</th>
+                            <th class="px-6 py-4">Latency & Cost</th>
+                            <th class="px-6 py-4 text-center">Status</th>
+                            <th class="px-6 py-4 text-right">Inspect</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logs-table-body" class="divide-y divide-white/5 text-sm">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="no-logs-view" class="hidden py-12 text-center text-slate-500 text-xs">
+                No requests found in MongoDB. Make some completions requests to view logs here.
+            </div>
+
+            <!-- Pagination Footer -->
+            <div class="px-6 py-4 border-t border-white/5 bg-white/[0.005] flex items-center justify-between">
+                <span id="log-pagination-info" class="text-xs text-slate-400">Showing 0 - 0 of 0 logs</span>
+                <div class="flex items-center gap-2">
+                    <button id="log-prev-btn" onclick="changeLogsPage(-1)" class="px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none text-slate-300 rounded-lg text-xs font-semibold border border-white/10 transition">
+                        Prev
+                    </button>
+                    <button id="log-next-btn" onclick="changeLogsPage(1)" class="px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none text-slate-300 rounded-lg text-xs font-semibold border border-white/10 transition">
+                        Next
+                    </button>
+                </div>
             </div>
         </section>
     </main>
@@ -544,6 +624,89 @@
         </div>
     </div>
 
+    <!-- LOGS INSPECT DETAIL MODAL -->
+    <div id="logs-detail-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md items-center justify-center z-50 hidden transition-opacity duration-300">
+        <div class="glass-panel w-full max-w-4xl rounded-3xl p-8 shadow-2xl relative border border-white/10 mx-4 max-h-[90vh] overflow-y-auto">
+            <!-- Header -->
+            <div class="flex justify-between items-start mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="p-3 rounded-xl bg-brand-500/10 border border-brand-500/20 text-brand-400">
+                        <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-white">Log Details: Request #<span id="inspect-req-num"></span></h2>
+                        <p class="text-xs text-slate-400 mt-0.5" id="inspect-req-id"></p>
+                    </div>
+                </div>
+                <button onclick="closeLogsDetailModal()" class="p-1 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Content Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Metadata Side -->
+                <div class="space-y-4 md:col-span-1 border-r border-white/5 pr-6">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Metadata</h3>
+                    <div class="space-y-2 text-xs">
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Client / Key:</span><span class="text-white font-medium" id="inspect-client"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Timestamp:</span><span class="text-white font-medium" id="inspect-time"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Model:</span><span class="text-white font-medium" id="inspect-model"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Mode:</span><span class="text-white font-medium" id="inspect-mode"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Status:</span><span class="font-medium" id="inspect-status"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Latency:</span><span class="text-white font-medium" id="inspect-latency"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Cost USD:</span><span class="text-emerald-400 font-medium" id="inspect-cost"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Prompt Tokens:</span><span class="text-white font-medium" id="inspect-prompt-tokens"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Completion Tokens:</span><span class="text-white font-medium" id="inspect-completion-tokens"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Cached Tokens:</span><span class="text-white font-medium" id="inspect-cached-tokens"></span></div>
+                        <div class="flex justify-between py-1.5 border-b border-white/5"><span class="text-slate-400">Total Tokens:</span><span class="text-white font-medium" id="inspect-total-tokens"></span></div>
+                    </div>
+                    <div id="inspect-error-container" class="hidden p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs mt-3">
+                        <p class="font-bold mb-1">Error Message:</p>
+                        <p id="inspect-error-text" class="font-mono break-all"></p>
+                    </div>
+                </div>
+
+                <!-- Prompt / Response Side -->
+                <div class="md:col-span-2 space-y-6">
+                    <!-- Prompt -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">User Prompt (Messages)</h3>
+                        <div id="inspect-prompt-container" class="w-full p-4 rounded-xl bg-white/5 border border-white/10 max-h-[220px] overflow-y-auto space-y-3">
+                            <!-- Messages will render here -->
+                        </div>
+                    </div>
+
+                    <!-- Response -->
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Model Response</h3>
+                        <div id="inspect-response-container" class="w-full p-4 rounded-xl bg-brand-500/5 border border-brand-500/10 max-h-[300px] overflow-y-auto">
+                            <pre id="inspect-response-text" class="text-xs text-slate-200 font-mono whitespace-pre-wrap break-all"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3 mt-8 border-t border-white/5 pt-6">
+                <button type="button" onclick="toggleInspectRawJson()" class="px-5 py-2.5 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/10 border border-white/10 transition text-slate-300">
+                    Toggle Raw JSON
+                </button>
+                <button type="button" onclick="closeLogsDetailModal()" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-xl text-sm font-semibold transition">
+                    Close
+                </button>
+            </div>
+            
+            <div id="inspect-raw-json-text-container" class="hidden mt-6 p-4 rounded-xl bg-black/60 border border-white/10 max-h-[300px] overflow-y-auto">
+                <pre id="inspect-raw-json-text" class="text-[11px] text-cyan-400 font-mono whitespace-pre-wrap"></pre>
+            </div>
+        </div>
+    </div>
+
     <!-- Javascript Actions Logic -->
     <script>
         let adminPassword = localStorage.getItem('admin_password') || '';
@@ -551,6 +714,12 @@
         let tokensChart = null;
         let costChart = null;
         let tunnelBinaryExists = false;  // updated from status polling
+        
+        // MongoDB request logs state
+        let currentLogsOffset = 0;
+        let logsLimit = 15;
+        let latestLogs = [];
+        let currentInspectLog = null;
 
         window.onload = function() {
             if (!adminPassword) {
@@ -586,6 +755,11 @@
             showLoginModal();
             document.getElementById('keys-table-body').innerHTML = '';
             document.getElementById('revoked-keys-table-body').innerHTML = '';
+            
+            // Clear request logs UI
+            document.getElementById('logs-table-body').innerHTML = '';
+            document.getElementById('stat-total-requests').innerText = '0';
+            latestLogs = [];
         }
 
         async function handleLogin(e) {
@@ -999,6 +1173,10 @@
                 ).length;
                 document.getElementById('stat-total-tokens').innerText = keys.reduce((acc, k) => acc + k.total_tokens_used, 0).toLocaleString();
                 document.getElementById('stat-total-spend').innerText = '$' + keys.reduce((acc, k) => acc + (k.amount_spent || 0.0), 0.0).toFixed(4);
+
+                // Fetch MongoDB logs and stats
+                fetchStats();
+                fetchLogs(currentLogsOffset);
 
                 // Render Active Keys Table
                 if (activeKeys.length === 0) {
@@ -1449,6 +1627,254 @@
             } catch (err) {
                 alert('Connection failure.');
             }
+        }
+
+        // Fetch request logs from MongoDB
+        async function fetchLogs(offset = 0) {
+            if (!adminPassword) return;
+            currentLogsOffset = offset;
+            const status = document.getElementById('log-filter-status').value;
+            const client = document.getElementById('log-filter-client').value;
+            
+            let url = `/api/admin/logs?limit=${logsLimit}&offset=${offset}`;
+            if (status) url += `&status=${encodeURIComponent(status)}`;
+            if (client) url += `&client=${encodeURIComponent(client)}`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    latestLogs = data.logs || [];
+                    renderLogs(data);
+                } else if (response.status === 401) {
+                    logout();
+                }
+            } catch (err) {
+                console.error("Failed to fetch MongoDB request logs", err);
+            }
+        }
+
+        // Fetch overall stats from MongoDB
+        async function fetchStats() {
+            if (!adminPassword) return;
+            try {
+                const response = await fetch('/api/admin/stats', {
+                    headers: { 'X-Admin-Password': adminPassword }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('stat-total-requests').innerText = data.total_requests || 0;
+                }
+            } catch (err) {
+                console.error("Failed to fetch MongoDB request stats", err);
+            }
+        }
+
+        // Render logs list in the table
+        function renderLogs(data) {
+            const tbody = document.getElementById('logs-table-body');
+            const noLogsView = document.getElementById('no-logs-view');
+            tbody.innerHTML = '';
+
+            const logs = data.logs || [];
+            const total = data.total || 0;
+
+            if (logs.length === 0) {
+                noLogsView.classList.remove('hidden');
+            } else {
+                noLogsView.classList.add('hidden');
+                
+                logs.forEach(log => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-white/[0.02] transition border-b border-white/5';
+                    
+                    // Format Timestamp
+                    let timeStr = 'Unknown';
+                    if (log.timestamp) {
+                        const date = new Date(log.timestamp);
+                        timeStr = date.toLocaleString();
+                    }
+
+                    // Format Status Badge
+                    let statusBadge = '';
+                    if (log.status === 'success') {
+                        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Success</span>`;
+                    } else if (log.status === 'cancelled') {
+                        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">Cancelled</span>`;
+                    } else {
+                        statusBadge = `<span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/20">Error</span>`;
+                    }
+
+                    // Tokens string
+                    const promptT = log.prompt_tokens || 0;
+                    const completionT = log.completion_tokens || 0;
+                    const totalT = log.total_tokens || (promptT + completionT);
+                    const cachedT = log.cached_tokens || 0;
+                    const cacheInfo = cachedT > 0 ? ` (${cachedT} cached)` : '';
+                    
+                    // Cost / Latency
+                    const latency = log.latency_ms ? `${log.latency_ms} ms` : 'N/A';
+                    const cost = log.cost ? `$${log.cost.toFixed(5)}` : '$0.00000';
+
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 font-mono font-bold text-brand-400">#${log.request_number || 0}</td>
+                        <td class="px-6 py-4 text-xs text-slate-400">${timeStr}</td>
+                        <td class="px-6 py-4 font-medium text-white">${escapeHtml(log.client_name || 'Anonymous')}</td>
+                        <td class="px-6 py-4 text-xs text-slate-300">
+                            <span class="font-mono text-slate-500">[${log.stream ? 'Stream' : 'Batch'}]</span>
+                            <span class="ml-1">${escapeHtml(log.model || 'mlx-model')}</span>
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-300">
+                            <span class="font-semibold text-white">${totalT}</span>
+                            <span class="text-slate-500">(${promptT} in / ${completionT} out${cacheInfo})</span>
+                        </td>
+                        <td class="px-6 py-4 text-xs text-slate-300">
+                            <div class="font-medium text-slate-200">${latency}</div>
+                            <div class="text-[11px] text-emerald-400">${cost}</div>
+                        </td>
+                        <td class="px-6 py-4 text-center">${statusBadge}</td>
+                        <td class="px-6 py-4 text-right">
+                            <button onclick="inspectLog('${log.request_id}')" class="px-2.5 py-1.5 bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 rounded-lg text-xs font-semibold transition">
+                                Inspect
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // Update client filter choices dynamically
+            populateClientFilter(logs);
+
+            // Update pagination info
+            const start = currentLogsOffset + 1;
+            const end = Math.min(currentLogsOffset + logsLimit, total);
+            document.getElementById('log-pagination-info').innerText = total > 0 ? `Showing ${start} - ${end} of ${total} logs` : 'Showing 0 - 0 of 0 logs';
+            document.getElementById('log-prev-btn').disabled = currentLogsOffset === 0;
+            document.getElementById('log-next-btn').disabled = currentLogsOffset + logsLimit >= total;
+        }
+
+        // Populate client filter drop down dynamically
+        let knownClients = new Set();
+        function populateClientFilter(logs) {
+            const select = document.getElementById('log-filter-client');
+            let addedNew = false;
+            
+            logs.forEach(log => {
+                const clientName = log.client_name || 'Anonymous';
+                if (!knownClients.has(clientName)) {
+                    knownClients.add(clientName);
+                    addedNew = true;
+                }
+            });
+
+            if (addedNew) {
+                // Clear and rebuild options
+                const currentValue = select.value;
+                select.innerHTML = '<option value="" class="bg-slate-900 text-slate-300">All Clients</option>';
+                Array.from(knownClients).sort().forEach(client => {
+                    const opt = document.createElement('option');
+                    opt.value = client;
+                    opt.className = 'bg-slate-900 text-slate-300';
+                    opt.innerText = client;
+                    select.appendChild(opt);
+                });
+                select.value = currentValue;
+            }
+        }
+
+        function changeLogsPage(direction) {
+            const nextOffset = currentLogsOffset + (direction * logsLimit);
+            if (nextOffset >= 0) {
+                fetchLogs(nextOffset);
+            }
+        }
+
+        // Open logs detail modal and load data
+        async function inspectLog(reqId) {
+            const log = latestLogs.find(l => l.request_id === reqId);
+            if (!log) return;
+            
+            currentInspectLog = log;
+            document.getElementById('inspect-req-num').innerText = log.request_number || 0;
+            document.getElementById('inspect-req-id').innerText = `ID: ${log.request_id}`;
+            document.getElementById('inspect-client').innerText = log.client_name || 'Anonymous';
+            document.getElementById('inspect-time').innerText = log.timestamp ? new Date(log.timestamp).toLocaleString() : 'Unknown';
+            document.getElementById('inspect-model').innerText = log.model || 'mlx-model';
+            document.getElementById('inspect-mode').innerText = log.stream ? 'Streaming' : 'Blocking Batch';
+            
+            const statusEl = document.getElementById('inspect-status');
+            statusEl.innerText = log.status.toUpperCase();
+            if (log.status === 'success') {
+                statusEl.className = 'text-emerald-400 font-bold';
+            } else if (log.status === 'cancelled') {
+                statusEl.className = 'text-amber-400 font-bold';
+            } else {
+                statusEl.className = 'text-rose-400 font-bold';
+            }
+
+            document.getElementById('inspect-latency').innerText = log.latency_ms ? `${log.latency_ms} ms` : 'N/A';
+            document.getElementById('inspect-cost').innerText = log.cost ? `$${log.cost.toFixed(6)}` : '$0.000000';
+            document.getElementById('inspect-prompt-tokens').innerText = log.prompt_tokens || 0;
+            document.getElementById('inspect-completion-tokens').innerText = log.completion_tokens || 0;
+            document.getElementById('inspect-cached-tokens').innerText = log.cached_tokens || 0;
+            document.getElementById('inspect-total-tokens').innerText = log.total_tokens || 0;
+
+            const errContainer = document.getElementById('inspect-error-container');
+            if (log.status === 'error' && log.error_message) {
+                document.getElementById('inspect-error-text').innerText = log.error_message;
+                errContainer.classList.remove('hidden');
+            } else {
+                errContainer.classList.add('hidden');
+            }
+
+            // Render Prompt messages list
+            const promptContainer = document.getElementById('inspect-prompt-container');
+            promptContainer.innerHTML = '';
+            const messages = log.prompt || [];
+            
+            if (Array.isArray(messages)) {
+                messages.forEach(msg => {
+                    const msgDiv = document.createElement('div');
+                    msgDiv.className = `p-3 rounded-lg text-xs leading-relaxed ${
+                        msg.role === 'user' ? 'bg-white/5 border border-white/10' : 'bg-brand-500/10 border border-brand-500/20 text-brand-300'
+                    }`;
+                    
+                    msgDiv.innerHTML = `
+                        <div class="font-bold uppercase text-[10px] tracking-wider mb-1 text-slate-400">${escapeHtml(msg.role)}</div>
+                        <div class="whitespace-pre-wrap break-words text-slate-200">${escapeHtml(msg.content || '')}</div>
+                    `;
+                    promptContainer.appendChild(msgDiv);
+                });
+            } else {
+                promptContainer.innerText = typeof messages === 'string' ? messages : JSON.stringify(messages);
+            }
+
+            // Render response
+            document.getElementById('inspect-response-text').innerText = log.response || (log.status === 'cancelled' ? '[Request Cancelled by Client]' : '[No Response Generated]');
+
+            // Render raw json
+            document.getElementById('inspect-raw-json-text').innerText = JSON.stringify(log, null, 2);
+            document.getElementById('inspect-raw-json-text-container').classList.add('hidden');
+
+            const modal = document.getElementById('logs-detail-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeLogsDetailModal() {
+            const modal = document.getElementById('logs-detail-modal');
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+
+        function toggleInspectRawJson() {
+            const container = document.getElementById('inspect-raw-json-text-container');
+            container.classList.toggle('hidden');
         }
 
         // HTML escaping helper

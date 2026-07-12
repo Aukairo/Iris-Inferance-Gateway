@@ -75,7 +75,8 @@ class RequestContext:
         top_p: float,
         response_queue: asyncio.Queue,
         loop: asyncio.AbstractEventLoop,
-        api_key: Optional[str] = None
+        api_key: Optional[str] = None,
+        messages: Optional[List[Dict[str, Any]]] = None
     ) -> None:
         self.request_id = request_id
         self.prompt_tokens = prompt_tokens
@@ -85,6 +86,7 @@ class RequestContext:
         self.response_queue = response_queue
         self.loop = loop
         self.api_key = api_key
+        self.messages = messages
         
         # State variables
         self.cancelled: bool = False
@@ -96,6 +98,7 @@ class RequestContext:
         self.time_first_token: Optional[float] = None
         self.completion_tokens: int = 0
         self.cached_tokens: int = 0
+        self.generated_text: str = ""
 
 
 class InferenceScheduler:
@@ -360,6 +363,8 @@ class InferenceScheduler:
                     req_ctx.detokenizer.add_token(r_gen.token)
                     req_ctx.completion_tokens += 1
                     text_segment = req_ctx.detokenizer.last_segment
+                    if text_segment:
+                        req_ctx.generated_text += text_segment
 
                     # Send generated text token segment to client
                     req_ctx.loop.call_soon_threadsafe(
@@ -373,6 +378,7 @@ class InferenceScheduler:
                         req_ctx.detokenizer.finalize()
                         final_segment = req_ctx.detokenizer.last_segment
                         if final_segment:
+                            req_ctx.generated_text += final_segment
                             req_ctx.loop.call_soon_threadsafe(
                                 req_ctx.response_queue.put_nowait,
                                 (final_segment, None)

@@ -321,3 +321,29 @@ def test_content_blocks_support(mock_engine_and_scheduler) -> None:
             assert response.status_code == 200
             data = response.json()
             assert data["choices"][0]["message"]["content"] == "Blocks work!"
+
+
+def test_normalize_messages_util() -> None:
+    """
+    Directly test routes.normalize_messages to ensure it:
+    1. Alternates user/assistant roles.
+    2. Converts tool messages to user.
+    3. Merges consecutive same-role messages.
+    """
+    from app.api.routes import normalize_messages
+    from app.models.schemas import ChatMessage
+    
+    messages = [
+        ChatMessage(role="system", content="System instruction"),
+        ChatMessage(role="user", content="User message 1"),
+        ChatMessage(role="assistant", content=None, tool_calls=[{"id": "c1", "type": "function", "function": {"name": "test_func", "arguments": "{}"}}]),
+        ChatMessage(role="tool", content="Tool result", name="test_func"),
+        ChatMessage(role="user", content="User message 2")
+    ]
+    
+    normalized = normalize_messages(messages)
+    assert len(normalized) == 4
+    assert normalized[0] == {"role": "system", "content": "System instruction"}
+    assert normalized[1] == {"role": "user", "content": "User message 1"}
+    assert normalized[2] == {"role": "assistant", "content": "[Call Tool: test_func({})]"}
+    assert normalized[3] == {"role": "user", "content": "[Tool Response for 'test_func']:\nTool result\n\nUser message 2"}

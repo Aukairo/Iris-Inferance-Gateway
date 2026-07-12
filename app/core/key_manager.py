@@ -67,10 +67,54 @@ class KeyManager:
                 self._save_unlocked()
                 logger.info("Registered default static API key in storage.")
 
+    async def init_store_async(self) -> None:
+        from app.core.mongodb import mongodb_manager
+        if mongodb_manager.enabled and mongodb_manager.db is not None:
+            try:
+                cursor = mongodb_manager.db["api_keys"].find({})
+                keys_data = {}
+                async for doc in cursor:
+                    key_val = doc.get("key")
+                    if key_val:
+                        record_dict = {k: v for k, v in doc.items() if k != "_id"}
+                        keys_data[key_val] = ApiKeyRecord(**record_dict)
+                
+                with self.lock:
+                    self.keys = keys_data
+                logger.info("Loaded %d API keys from MongoDB.", len(self.keys))
+                
+                # Check for default static key as well
+                if settings.api_key and settings.api_key not in self.keys:
+                    default_key = settings.api_key
+                    record = ApiKeyRecord(
+                        key=default_key,
+                        name="Default Config Key",
+                        token_cap=-1,
+                        active=True
+                    )
+                    with self.lock:
+                        self.keys[default_key] = record
+                    await mongodb_manager.db["api_keys"].replace_one(
+                        {"key": default_key},
+                        record.model_dump(),
+                        upsert=True
+                    )
+                    logger.info("Registered default static API key in MongoDB.")
+                return
+            except Exception as e:
+                logger.error("Failed to load API keys from MongoDB: %s. Falling back to file store.", str(e))
+        
+        # Fallback to sync file loading
+        self.init_store()
+
     def _save_unlocked(self) -> None:
         """
         Internal save helper (called while holding the lock).
         """
+        from app.core.mongodb import mongodb_manager
+        if mongodb_manager.enabled:
+            return
+            
         try:
             with open(self.filepath, "w", encoding="utf-8") as f:
                 json.dump(
@@ -140,6 +184,21 @@ class KeyManager:
                     record.amount_spent,
                     record.amount_cap
                 )
+                
+                # Update in MongoDB if enabled
+                from app.core.mongodb import mongodb_manager
+                if mongodb_manager.enabled:
+                    rec_dict = record.model_dump()
+                    async def _db_update():
+                        try:
+                            await mongodb_manager.db["api_keys"].replace_one(
+                                {"key": rec_dict["key"]},
+                                rec_dict,
+                                upsert=True
+                            )
+                        except Exception as e:
+                            logger.error("Failed to update API key usage in MongoDB: %s", str(e))
+                    mongodb_manager.run_async(_db_update())
 
     def create_key(self, name: str, token_cap: int = -1, amount_cap: float = -1.0) -> ApiKeyRecord:
         """
@@ -158,6 +217,21 @@ class KeyManager:
             self.keys[generated_key] = record
             self._save_unlocked()
             logger.info("Created new API key for user: %s with token_cap=%d, amount_cap=%.4f", name, token_cap, amount_cap)
+            
+            from app.core.mongodb import mongodb_manager
+            if mongodb_manager.enabled:
+                rec_dict = record.model_dump()
+                async def _db_update():
+                    try:
+                        await mongodb_manager.db["api_keys"].replace_one(
+                            {"key": rec_dict["key"]},
+                            rec_dict,
+                            upsert=True
+                        )
+                    except Exception as e:
+                        logger.error("Failed to save new key to MongoDB: %s", str(e))
+                mongodb_manager.run_async(_db_update())
+                
             return record
 
     def delete_key(self, key: str) -> bool:
@@ -171,6 +245,20 @@ class KeyManager:
                 record.revoked = True
                 self._save_unlocked()
                 logger.info("Revoked/Soft-deleted API key: %s (%s)", key, record.name)
+                
+                from app.core.mongodb import mongodb_manager
+                if mongodb_manager.enabled:
+                    rec_dict = record.model_dump()
+                    async def _db_update():
+                        try:
+                            await mongodb_manager.db["api_keys"].replace_one(
+                                {"key": rec_dict["key"]},
+                                rec_dict,
+                                upsert=True
+                            )
+                        except Exception as e:
+                            logger.error("Failed to update revoked status in MongoDB: %s", str(e))
+                    mongodb_manager.run_async(_db_update())
                 return True
             return False
 
@@ -185,6 +273,20 @@ class KeyManager:
                 record.amount_cap = amount_cap
                 self._save_unlocked()
                 logger.info("Updated caps for key %s to token_cap=%d, amount_cap=%.4f", record.name, token_cap, amount_cap)
+                
+                from app.core.mongodb import mongodb_manager
+                if mongodb_manager.enabled:
+                    rec_dict = record.model_dump()
+                    async def _db_update():
+                        try:
+                            await mongodb_manager.db["api_keys"].replace_one(
+                                {"key": rec_dict["key"]},
+                                rec_dict,
+                                upsert=True
+                            )
+                        except Exception as e:
+                            logger.error("Failed to update key caps in MongoDB: %s", str(e))
+                    mongodb_manager.run_async(_db_update())
                 return True
             return False
 
@@ -201,6 +303,21 @@ class KeyManager:
                 self.keys[new_key] = record
                 self._save_unlocked()
                 logger.info("Rotated API key for %s. Old key: %s, New key: %s", record.name, old_key, new_key)
+                
+                from app.core.mongodb import mongodb_manager
+                if mongodb_manager.enabled:
+                    rec_dict = record.model_dump()
+                    async def _db_update():
+                        try:
+                            await mongodb_manager.db["api_keys"].delete_one({"key": old_key})
+                            await mongodb_manager.db["api_keys"].replace_one(
+                                {"key": rec_dict["key"]},
+                                rec_dict,
+                                upsert=True
+                            )
+                        except Exception as e:
+                            logger.error("Failed to rotate key in MongoDB: %s", str(e))
+                    mongodb_manager.run_async(_db_update())
                 return new_key
             return None
 
@@ -218,6 +335,20 @@ class KeyManager:
                 record.amount_spent = 0.0
                 self._save_unlocked()
                 logger.info("Reset token usage and spending counters for key %s", record.name)
+                
+                from app.core.mongodb import mongodb_manager
+                if mongodb_manager.enabled:
+                    rec_dict = record.model_dump()
+                    async def _db_update():
+                        try:
+                            await mongodb_manager.db["api_keys"].replace_one(
+                                {"key": rec_dict["key"]},
+                                rec_dict,
+                                upsert=True
+                            )
+                        except Exception as e:
+                            logger.error("Failed to reset key usage in MongoDB: %s", str(e))
+                    mongodb_manager.run_async(_db_update())
                 return True
             return False
 

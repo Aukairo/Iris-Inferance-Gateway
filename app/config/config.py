@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     price_per_1m_output_tokens: float = 0.60
     price_per_1m_cached_tokens: float = 0.075
 
+    # MongoDB Configuration
+    mongodb_uri: str = "mongodb://localhost:27017"
+    mongodb_db: str = "iris_engine"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

@@ -28,12 +28,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     
     # 0. Initialize persistent configuration & API key databases
     try:
-        config_manager.init_store()
+        from app.core.mongodb import mongodb_manager
+        import sys
+        if "pytest" not in sys.modules:
+            mongodb_manager.init_db(settings.mongodb_uri, settings.mongodb_db)
+    except Exception as e:
+        logger.error("Failed to initialize MongoDB: %s", str(e))
+
+    try:
+        await config_manager.init_store_async()
     except Exception as e:
         logger.error("Failed to initialize configuration database: %s", str(e))
 
     try:
-        key_manager.init_store()
+        await key_manager.init_store_async()
     except Exception as e:
         logger.error("Failed to initialize API key database: %s", str(e))
     
@@ -88,6 +96,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("[shutdown] step 3/3: unloading model...")
     model_wrapper.unload_model()
     logger.info("[shutdown] step 3/3: model unloaded.")
+
+    logger.info("[shutdown] step 4/4: closing MongoDB client...")
+    try:
+        from app.core.mongodb import mongodb_manager
+        # Use a short helper thread/task since shutdown runs synchronously
+        import asyncio
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(mongodb_manager.close_db())
+        else:
+            loop.run_until_complete(mongodb_manager.close_db())
+    except Exception as e:
+        logger.error("Error closing MongoDB connection: %s", str(e))
 
     logger.info("Clean shutdown completed.")
 
@@ -193,6 +214,15 @@ def create_app() -> FastAPI:
 
     # Mount API Key Management & admin routes
     app.include_router(admin_router)
+
+    # Mount Root Landing Page route
+    @app.get("/", response_class=HTMLResponse, tags=["landing"])
+    async def get_root_landing():
+        index_html_path = os.path.join(os.path.dirname(__file__), "static", "index.html")
+        if not os.path.exists(index_html_path):
+            raise HTTPException(status_code=404, detail="Landing page HTML not found.")
+        with open(index_html_path, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read())
 
     # Mount Admin Dashboard UI route
     @app.get("/admin", response_class=HTMLResponse, tags=["admin"])
