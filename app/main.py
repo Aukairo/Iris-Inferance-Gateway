@@ -1,10 +1,12 @@
 import time
 import os
+import re
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI, Request, HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from app.config.config import settings
 from app.core.logging import logger
@@ -90,6 +92,46 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Clean shutdown completed.")
 
 
+class PathNormalizationMiddleware:
+    """
+    ASGI middleware to collapse multiple consecutive slashes and automatically
+    correct misconfigured client paths (self-healing for base URLs ending in
+    /v1/chat/completions or similar).
+    """
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            
+            # 1. Normalize duplicate slashes first
+            if "//" in path:
+                path = re.sub(r"/+", "/", path)
+
+            # 2. Self-healing for base URL suffix appending
+            # e.g., /v1/chat/completions/models -> /v1/models
+            # e.g., /v1/chat/completions/chat/completions -> /v1/chat/completions
+            for prefix in ["/v1/chat/completions", "/chat/completions"]:
+                if path.startswith(prefix + "/"):
+                    suffix = path[len(prefix):]
+                    if suffix in ["/models", "/models/"]:
+                        path = "/v1/models"
+                    elif suffix in ["/chat/completions", "/chat/completions/"]:
+                        path = "/v1/chat/completions"
+                    elif suffix == "/":
+                        path = "/v1/chat/completions"
+                    break
+
+            # 3. Update the scope if paths were modified
+            if path != scope.get("path", ""):
+                scope["path"] = path
+                if "raw_path" in scope:
+                    scope["raw_path"] = path.encode("utf-8")
+                    
+        await self.app(scope, receive, send)
+
+
 def create_app() -> FastAPI:
     """
     Factory function to initialize the FastAPI application.
@@ -109,6 +151,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Path normalization middleware to collapse multiple slashes
+    app.add_middleware(PathNormalizationMiddleware)
 
     # Global request duration middleware for logging
     @app.middleware("http")
@@ -130,6 +175,21 @@ def create_app() -> FastAPI:
 
     # Mount completions and default API routing
     app.include_router(router)
+
+    # Register validation error exception handler
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        logger.error(
+            "Validation error on %s %s: %s. Request body: %s",
+            request.method,
+            request.url.path,
+            str(exc.errors()),
+            getattr(exc, "body", None)
+        )
+        return JSONResponse(
+            status_code=422,
+            content={"detail": exc.errors(), "body": getattr(exc, "body", None)}
+        )
 
     # Mount API Key Management & admin routes
     app.include_router(admin_router)

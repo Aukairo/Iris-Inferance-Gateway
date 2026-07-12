@@ -150,3 +150,174 @@ def test_chat_completions_streaming(mock_engine_and_scheduler) -> None:
             assert "Hello" in chunks[1]
             assert "World!" in chunks[2]
             assert "[DONE]" in lines[-3] or "[DONE]" in lines[-2]
+
+
+def test_models_endpoints(mock_engine_and_scheduler) -> None:
+    """
+    Verify /v1/models and /models list endpoints.
+    """
+    app = create_app()
+    with TestClient(app) as client:
+        # Test with /v1/models
+        response = client.get("/v1/models")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["object"] == "list"
+        assert len(data["data"]) == 1
+        assert data["data"][0]["id"] == "mock-qwen-model"
+        
+        # Test with /models
+        response = client.get("/models")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["object"] == "list"
+        assert data["data"][0]["id"] == "mock-qwen-model"
+
+
+def test_get_model_details(mock_engine_and_scheduler) -> None:
+    """
+    Verify retrieving specific model details by ID.
+    """
+    app = create_app()
+    with TestClient(app) as client:
+        # Success case
+        response = client.get("/v1/models/mock-qwen-model")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "mock-qwen-model"
+        assert data["object"] == "model"
+        
+        # Error case
+        response = client.get("/v1/models/non-existent-model")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"]
+
+
+def test_path_normalization_middleware(mock_engine_and_scheduler) -> None:
+    """
+    Verify that PathNormalizationMiddleware collapses consecutive slashes.
+    """
+    app = create_app()
+    with TestClient(app) as client:
+        # //models should resolve to /models
+        response = client.get("http://testserver//models")
+        assert response.status_code == 200
+        assert response.json()["object"] == "list"
+        
+        # /v1//models should resolve to /v1/models
+        response = client.get("/v1//models")
+        assert response.status_code == 200
+        assert response.json()["object"] == "list"
+        
+        # ///health should resolve to /health
+        response = client.get("///health")
+        assert response.status_code == 200
+        assert response.json()["status"] == "healthy"
+
+        # /v1/chat/completions/models should resolve to /v1/models
+        response = client.get("/v1/chat/completions/models")
+        assert response.status_code == 200
+        assert response.json()["object"] == "list"
+
+
+def test_self_healing_chat_completions(mock_engine_and_scheduler) -> None:
+    """
+    Verify that the misconfigured base URL path for chat completions is self-healed.
+    """
+    app = create_app()
+    
+    def mock_add_request(request_ctx: RequestContext) -> None:
+        request_ctx.completion_tokens = 1
+        request_ctx.response_queue.put_nowait(("Self-healed works!", "stop"))
+
+    with TestClient(app) as client:
+        with patch("app.api.routes.inference_scheduler.add_request", side_effect=mock_add_request):
+            payload = {
+                "messages": [{"role": "user", "content": "Hello"}],
+                "stream": False
+            }
+            # Post to /v1/chat/completions/chat/completions
+            response = client.post("/v1/chat/completions/chat/completions", json=payload)
+            assert response.status_code == 200
+            data = response.json()
+            assert data["choices"][0]["message"]["content"] == "Self-healed works!"
+
+
+def test_chat_completions_alias(mock_engine_and_scheduler) -> None:
+    """
+    Verify chat completions work via the alias /chat/completions.
+    """
+    app = create_app()
+    
+    def mock_add_request(request_ctx: RequestContext) -> None:
+        request_ctx.completion_tokens = 1
+        request_ctx.response_queue.put_nowait(("Hi", "stop"))
+
+    with TestClient(app) as client:
+        with patch("app.api.routes.inference_scheduler.add_request", side_effect=mock_add_request):
+            payload = {
+                "messages": [{"role": "user", "content": "Hello"}],
+                "stream": False
+            }
+            response = client.post("/chat/completions", json=payload)
+            assert response.status_code == 200
+            data = response.json()
+            assert data["object"] == "chat.completion"
+            assert data["choices"][0]["message"]["content"] == "Hi"
+
+
+def test_schema_robustness(mock_engine_and_scheduler) -> None:
+    """
+    Verify that ChatCompletionRequest handles unrecognized extra fields
+    and null content values without throwing a 422 validation error.
+    """
+    app = create_app()
+    
+    def mock_add_request(request_ctx: RequestContext) -> None:
+        request_ctx.completion_tokens = 1
+        request_ctx.response_queue.put_nowait(("Schema works!", "stop"))
+
+    with TestClient(app) as client:
+        with patch("app.api.routes.inference_scheduler.add_request", side_effect=mock_add_request):
+            payload = {
+                "messages": [
+                    {"role": "user", "content": "Hello"},
+                    {"role": "assistant", "content": None, "tool_calls": [{"id": "call_1", "type": "function"}]}
+                ],
+                "stream": False,
+                "extra_unsupported_key": "some_value",
+                "tools": [{"type": "function"}],
+                "tool_choice": "auto"
+            }
+            response = client.post("/v1/chat/completions", json=payload)
+            assert response.status_code == 200
+            data = response.json()
+            assert data["choices"][0]["message"]["content"] == "Schema works!"
+
+
+def test_content_blocks_support(mock_engine_and_scheduler) -> None:
+    """
+    Verify that ChatCompletionRequest handles content blocks (list of text dicts)
+    successfully and converts them to string content.
+    """
+    app = create_app()
+    
+    def mock_add_request(request_ctx: RequestContext) -> None:
+        request_ctx.completion_tokens = 1
+        request_ctx.response_queue.put_nowait(("Blocks work!", "stop"))
+
+    with TestClient(app) as client:
+        with patch("app.api.routes.inference_scheduler.add_request", side_effect=mock_add_request):
+            payload = {
+                "messages": [
+                    {"role": "user", "content": [
+                        {"type": "text", "text": "Hello, "},
+                        {"type": "text", "text": "world!"}
+                    ]}
+                ],
+                "stream": False
+            }
+            response = client.post("/v1/chat/completions", json=payload)
+            assert response.status_code == 200
+            data = response.json()
+            assert data["choices"][0]["message"]["content"] == "Blocks work!"

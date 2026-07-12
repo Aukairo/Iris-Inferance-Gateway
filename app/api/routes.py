@@ -16,6 +16,8 @@ from app.models.schemas import (
     ChatCompletionChoice,
     ChatCompletionChoiceMessage,
     ChatCompletionUsage,
+    ModelInfo,
+    ModelList,
 )
 from app.inference.engine import model_wrapper
 from app.batching.scheduler import inference_scheduler, RequestContext
@@ -25,8 +27,34 @@ router = APIRouter()
 START_TIME = time.time()
 
 
+def get_content_as_str(content: Any) -> str:
+    """
+    Extract and concatenate text from raw message content.
+    Handles standard string content and structured lists of content blocks.
+    """
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        text_parts = []
+        for block in content:
+            if isinstance(block, dict):
+                if block.get("type") == "text" and "text" in block:
+                    text_parts.append(block["text"])
+            elif isinstance(block, str):
+                text_parts.append(block)
+        return "".join(text_parts)
+    return str(content)
+
+
 @router.post(
     "/v1/chat/completions",
+    response_model=Union[ChatCompletionResponse, Any],  # StreamingResponse or ChatCompletionResponse
+    dependencies=[Depends(verify_api_key)]
+)
+@router.post(
+    "/chat/completions",
     response_model=Union[ChatCompletionResponse, Any],  # StreamingResponse or ChatCompletionResponse
     dependencies=[Depends(verify_api_key)]
 )
@@ -46,7 +74,7 @@ async def chat_completions(
 
     # Validate and tokenize the prompt messages using tokenizer chat template
     try:
-        messages_dicts = [{"role": m.role, "content": m.content} for m in request.messages]
+        messages_dicts = [{"role": m.role, "content": get_content_as_str(m.content)} for m in request.messages]
         # apply_chat_template applies the prompt format and returns token ids
         prompt_tokens = model_wrapper.tokenizer.apply_chat_template(
             messages_dicts,
@@ -170,3 +198,57 @@ async def metrics() -> Response:
             detail="Metrics collection is disabled."
         )
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+
+@router.get(
+    "/v1/models",
+    response_model=ModelList,
+    dependencies=[Depends(verify_api_key)]
+)
+@router.get(
+    "/models",
+    response_model=ModelList,
+    dependencies=[Depends(verify_api_key)]
+)
+async def list_models() -> ModelList:
+    """
+    OpenAI-compatible models list endpoint.
+    Returns the currently loaded or configured model.
+    """
+    active_model = model_wrapper.model_name or settings.model_name or "mlx-model"
+    return ModelList(
+        data=[
+            ModelInfo(
+                id=active_model,
+                created=1686935002,
+                owned_by="mlx-server"
+            )
+        ]
+    )
+
+
+@router.get(
+    "/v1/models/{model_id:path}",
+    response_model=ModelInfo,
+    dependencies=[Depends(verify_api_key)]
+)
+@router.get(
+    "/models/{model_id:path}",
+    response_model=ModelInfo,
+    dependencies=[Depends(verify_api_key)]
+)
+async def get_model(model_id: str) -> ModelInfo:
+    """
+    OpenAI-compatible model retrieve endpoint.
+    """
+    active_model = model_wrapper.model_name or settings.model_name or "mlx-model"
+    if model_id != active_model:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Model '{model_id}' not found. Currently loaded model is '{active_model}'."
+        )
+    return ModelInfo(
+        id=active_model,
+        created=1686935002,
+        owned_by="mlx-server"
+    )

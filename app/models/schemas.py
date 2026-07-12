@@ -4,7 +4,11 @@ from pydantic import BaseModel, Field
 
 class ChatMessage(BaseModel):
     role: str = Field(..., description="The role of the message author (e.g., system, user, assistant)")
-    content: str = Field(..., description="The contents of the message")
+    content: Optional[Union[str, List[Any]]] = Field(None, description="The contents of the message")
+
+    model_config = {
+        "extra": "allow"
+    }
 
 
 class ChatCompletionRequest(BaseModel):
@@ -15,6 +19,10 @@ class ChatCompletionRequest(BaseModel):
     max_tokens: Optional[int] = None
     stream: Optional[bool] = False
     stop: Optional[Union[str, List[str]]] = None
+
+    model_config = {
+        "extra": "allow"
+    }
 
 
 class ChatCompletionChoiceMessage(BaseModel):
@@ -60,3 +68,15 @@ class ChatCompletionChunk(BaseModel):
     created: int
     model: str
     choices: List[ChatCompletionChunkChoice]
+
+
+class ModelInfo(BaseModel):
+    id: str
+    object: str = "model"
+    created: int = Field(default=1686935002)
+    owned_by: str = "mlx-server"
+
+
+class ModelList(BaseModel):
+    object: str = "list"
+    data: List[ModelInfo]
