@@ -30,9 +30,24 @@ class ModelWrapper:
         logger.info("Initializing MLX inference engine with model: %s", model_name)
         t_start = time.perf_counter()
         try:
-            loaded = load(model_name)
-            self.model = loaded[0]
-            self.tokenizer = loaded[1]
+            try:
+                loaded = load(model_name)
+                self.model = loaded[0]
+                self.tokenizer = loaded[1]
+                self.processor = getattr(loaded, "processor", getattr(self.tokenizer, "processor", None))
+            except Exception as lm_err:
+                # Fallback to mlx_vlm for Vision-Language Models
+                try:
+                    from mlx_vlm import load as load_vlm
+                    logger.info("Attempting load via mlx_vlm for vision-language model...")
+                    model_vlm, processor_vlm = load_vlm(model_name)
+                    self.model = model_vlm
+                    self.processor = processor_vlm
+                    self.tokenizer = getattr(processor_vlm, "tokenizer", processor_vlm)
+                except Exception as vlm_err:
+                    logger.error("Failed loading with mlx_lm (%s) and mlx_vlm (%s)", str(lm_err), str(vlm_err))
+                    raise lm_err
+
             self.model_name = model_name
             
             # Print GPU details if available

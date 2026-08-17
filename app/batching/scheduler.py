@@ -31,11 +31,16 @@ class DynamicSampler:
         uids: List[int] = []
 
         # Determine the UIDs for the current batch rows
-        if bg.active_batch is not None and len(bg.active_batch.uids) == n_rows:
+        if hasattr(bg, "_generation_batch") and bg._generation_batch and len(getattr(bg._generation_batch, "uids", [])) == n_rows:
+            uids = bg._generation_batch.uids
+        elif hasattr(bg, "_prompt_batch") and bg._prompt_batch and len(getattr(bg._prompt_batch, "uids", [])) == n_rows:
+            uids = bg._prompt_batch.uids
+        elif hasattr(bg, "active_batch") and bg.active_batch and len(getattr(bg.active_batch, "uids", [])) == n_rows:
             uids = bg.active_batch.uids
-        else:
-            # During prompt processing, the rows correspond to unprocessed prompts
-            num_prompts = min(len(bg.unprocessed_prompts), bg.prefill_batch_size)
+        elif hasattr(bg, "_currently_processing") and bg._currently_processing and len(bg._currently_processing) == n_rows:
+            uids = [item[0] for item in bg._currently_processing]
+        elif hasattr(bg, "unprocessed_prompts") and bg.unprocessed_prompts:
+            num_prompts = min(len(bg.unprocessed_prompts), getattr(bg, "prefill_batch_size", n_rows))
             uids = [bg.unprocessed_prompts[i][0] for i in range(num_prompts)]
 
         sampled_tokens: List[mx.array] = []
@@ -175,9 +180,9 @@ class InferenceScheduler:
             self.running = False
             return
 
-        # Import and bind to the unified mlx_lm generation stream
-        from mlx_lm.generate import generation_stream
-        mx.set_default_stream(generation_stream)
+        # Ensure default GPU stream is bound for this worker thread context
+        if mx.metal.is_available():
+            mx.set_default_stream(mx.default_stream(mx.gpu))
 
         tokenizer = model_wrapper.tokenizer
         model = model_wrapper.model
@@ -284,11 +289,20 @@ class InferenceScheduler:
                 # own efficient internal caching for continuations.
                 caches = [None] * len(prompts)
 
+                # Build per-request samplers for continuous batching
+                request_samplers = []
+                for r in requests_to_insert:
+                    if r.temperature == 0.0:
+                        request_samplers.append(lambda x: mx.argmax(x, axis=-1))
+                    else:
+                        request_samplers.append(make_sampler(r.temperature, top_p=r.top_p))
+
                 # Insert segments and get assigned internal UIDs
                 new_uids = self.batch_generator.insert(
                     prompts=prompts,
                     max_tokens=max_tokens,
-                    caches=caches
+                    caches=caches,
+                    samplers=request_samplers
                 )
                 # Initialize detokenizer for each request and track them
                 for uid, r in zip(new_uids, requests_to_insert):
@@ -315,7 +329,7 @@ class InferenceScheduler:
             if self.active_requests:
                 try:
                     # Run one step of the MLX generation loop
-                    responses = self.batch_generator.next()
+                    step_output = self.batch_generator.next()
                 except Exception as e:
                     logger.error("Inference step crashed: %s", str(e), exc_info=True)
                     # Notify all active requests of the error and clear active dict
@@ -345,8 +359,16 @@ class InferenceScheduler:
                         logger.critical("Failed to reinitialize BatchGenerator: %s", str(reinit_err))
                     continue
 
-                # Process results
-                for r_gen in responses:
+                # Unpack BatchGenerator.next() output
+                # BatchGenerator.next() returns a tuple: (prompt_responses, generation_responses)
+                generation_responses = []
+                if isinstance(step_output, tuple) and len(step_output) == 2:
+                    _, generation_responses = step_output
+                elif isinstance(step_output, list):
+                    generation_responses = step_output
+
+                # Process generated token responses
+                for r_gen in generation_responses:
                     req_ctx = self.active_requests.get(r_gen.uid)
                     if not req_ctx:
                         continue

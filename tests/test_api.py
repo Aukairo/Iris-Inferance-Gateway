@@ -176,21 +176,23 @@ def test_models_endpoints(mock_engine_and_scheduler) -> None:
 
 def test_get_model_details(mock_engine_and_scheduler) -> None:
     """
-    Verify retrieving specific model details by ID.
+    Verify that the model details endpoint returns ModelInfo for any model ID (dynamic OpenAI compatibility).
     """
     app = create_app()
     with TestClient(app) as client:
-        # Success case
+        # Loaded model case
         response = client.get("/v1/models/mock-qwen-model")
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == "mock-qwen-model"
         assert data["object"] == "model"
         
-        # Error case
+        # Dynamic model case
         response = client.get("/v1/models/non-existent-model")
-        assert response.status_code == 404
-        assert "not found" in response.json()["detail"]
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "non-existent-model"
+        assert data["object"] == "model"
 
 
 def test_path_normalization_middleware(mock_engine_and_scheduler) -> None:
@@ -325,8 +327,8 @@ def test_content_blocks_support(mock_engine_and_scheduler) -> None:
 
 def test_normalize_messages_util() -> None:
     """
-    Directly test routes.normalize_messages to ensure it:
-    1. Alternates user/assistant roles.
+    Verify message normalization logic:
+    1. System message placed first.
     2. Converts tool messages to user.
     3. Merges consecutive same-role messages.
     """
@@ -345,5 +347,5 @@ def test_normalize_messages_util() -> None:
     assert len(normalized) == 4
     assert normalized[0] == {"role": "system", "content": "System instruction"}
     assert normalized[1] == {"role": "user", "content": "User message 1"}
-    assert normalized[2] == {"role": "assistant", "content": "[Call Tool: test_func({})]"}
+    assert normalized[2] == {"role": "assistant", "content": '<tool_call>\n{"name": "test_func", "arguments": {}}\n</tool_call>'}
     assert normalized[3] == {"role": "user", "content": "[Tool Response for 'test_func']:\nTool result\n\nUser message 2"}
